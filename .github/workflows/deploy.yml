@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, claude/mobile-phone-game-3e3i50]
   workflow_dispatch:
 
 permissions:
