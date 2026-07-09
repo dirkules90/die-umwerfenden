@@ -1,4 +1,4 @@
-import type { BallType, CharacterId, DigitSlot, GameMode, GameSession, RoundResult } from './types'
+import type { CharacterId, DigitSlot, GameMode, GameSession, RoundResult } from './types'
 import { digitForThrow, freeSlots, houseNumberFromDigits } from './houseNumberRules'
 
 export type GameEffect =
@@ -133,8 +133,4 @@ export function ballReturned(session: GameSession): { session: GameSession; effe
 
 export function beginNextTurn(session: GameSession): GameSession {
   return { ...session, phase: 'idle' }
-}
-
-export function ballTypeAllowed(_ballType: BallType): boolean {
-  return true
 }

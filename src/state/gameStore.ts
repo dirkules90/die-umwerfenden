@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { BallType, CharacterId, DigitSlot, GameMode, GameSession, PlayerStatistics, RoundResult, Settings } from '../game/types'
+import type { CharacterId, DigitSlot, GameMode, GameSession, PlayerStatistics, RoundResult, Settings } from '../game/types'
 import {
   ballReturned,
   beginNextTurn,
@@ -47,7 +47,6 @@ interface GameStore {
   settingsReturnTo: Screen
   selectedPlayers: CharacterId[]
   session: GameSession | null
-  ballType: BallType
   statistics: Record<CharacterId, PlayerStatistics>
   settings: Settings
   achievementBanner: AchievementBanner | null
@@ -64,7 +63,6 @@ interface GameStore {
   togglePlayer: (id: CharacterId) => void
   reorderPlayers: (order: CharacterId[]) => void
   startGame: (mode: GameMode, rounds: number) => void
-  setBallType: (type: BallType) => void
   beginAiming: () => void
   submitThrowResult: (pinsDown: number, isGutter: boolean) => void
   chooseDigit: (slot: DigitSlot) => void
@@ -87,7 +85,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
   settingsReturnTo: 'start',
   selectedPlayers: [],
   session: null,
-  ballType: 'leicht',
   statistics: loadAllStatistics(),
   settings: loadSettings(),
   achievementBanner: null,
@@ -129,15 +126,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({
       session: createSession(mode, rounds, selectedPlayers),
       screen: 'game',
-      ballType: 'leicht',
       perGameCounters: counters,
       finalRanking: null,
     })
     soundManager.ensureContext()
     soundManager.startAmbientLoop()
   },
-
-  setBallType: (type) => set({ ballType: type }),
 
   beginAiming: () => {
     const { session } = get()

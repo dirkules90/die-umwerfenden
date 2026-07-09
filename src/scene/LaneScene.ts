@@ -3,8 +3,8 @@ import type RAPIER from '@dimforge/rapier3d-compat'
 import { ensureRapierInitialized, createWorld, FIXED_TIMESTEP } from '../physics/world'
 import { isInGutter, isPinFallen } from '../physics/collisions'
 import {
-  BALL_RADIUS_HEAVY,
-  BALL_RADIUS_LIGHT,
+  BALL_RADIUS,
+  LANE_HALF_WIDTH,
   PIN_HEIGHT,
   PIN_LAYOUT,
   PIN_STAND_Z,
@@ -20,7 +20,7 @@ import { Lever } from './Lever'
 import { CameraRig } from './CameraRig'
 import { Animator } from './Animator'
 import { CharacterModel } from '../characters/CharacterModel'
-import type { AvatarConfig, BallType } from '../game/types'
+import type { AvatarConfig } from '../game/types'
 
 type ThrowPhase = 'idle' | 'aiming' | 'rolling' | 'settled'
 
@@ -30,9 +30,11 @@ export interface SettleResult {
   wasAllNine: boolean
 }
 
-const PRE_THROW_POS = new THREE.Vector3(0.4, 1.9, START_Z + 0.6)
-const PRE_THROW_LOOK = new THREE.Vector3(0, 0.4, PIN_STAND_Z)
+// Kamera muss HINTER dem Charakter stehen (größerer Z-Wert), sonst blickt sie an ihm
+// vorbei nach vorn und der Werfer ist nie im Bild.
 const CHARACTER_STAND = new THREE.Vector3(0, 0, START_Z + 0.9)
+const PRE_THROW_POS = new THREE.Vector3(0.75, 2.0, START_Z + 3.1)
+const PRE_THROW_LOOK = new THREE.Vector3(0, 0.75, PIN_STAND_Z + 1)
 const FORWARD_DIR = new THREE.Vector3(0, 0, -1)
 
 export class LaneScene {
@@ -73,7 +75,7 @@ export class LaneScene {
     this.aimTrajectory.visible = false
   }
 
-  async init(ballType: BallType) {
+  async init() {
     this.rapier = await ensureRapierInitialized()
     this.world = createWorld()
 
@@ -89,6 +91,18 @@ export class LaneScene {
       groundBody,
     )
 
+    // Rückwand am Kegelstand (deckt sich mit der sichtbaren Fangwand in Environment.ts):
+    // ohne diese Kollision würde eine sehr kraftvoll geworfene Kugel physikalisch ungebremst
+    // durch den Kegelstand und das Vereinsheim hindurchrollen.
+    const backWallBody = this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed())
+    this.world.createCollider(
+      this.rapier.ColliderDesc.cuboid(LANE_HALF_WIDTH + 0.2, 0.6, 0.1)
+        .setTranslation(0, 0.6, PIN_STAND_Z - 1.15)
+        .setFriction(0.6)
+        .setRestitution(0.1),
+      backWallBody,
+    )
+
     this.pins = PIN_LAYOUT.map((p, i) => {
       const pos = new THREE.Vector3(p.x, PIN_HEIGHT / 2, PIN_STAND_Z + p.zOffset)
       const pin = new Pin(this.rapier, this.world, pos, i)
@@ -96,7 +110,7 @@ export class LaneScene {
       return pin
     })
 
-    this.ball = new Ball(this.rapier, this.world, ballType)
+    this.ball = new Ball(this.rapier, this.world)
     this.scene.add(this.ball.mesh)
 
     this.lever = new Lever()
@@ -136,13 +150,8 @@ export class LaneScene {
     this.scene.add(this.character.group)
   }
 
-  prepareBall(type: BallType) {
-    if (this.ball) {
-      this.scene.remove(this.ball.mesh)
-      this.world.removeRigidBody(this.ball.body)
-    }
-    this.ball = new Ball(this.rapier, this.world, type)
-    this.scene.add(this.ball.mesh)
+  resetBall() {
+    this.ball.reset()
     this.throwPhase = 'idle'
   }
 
@@ -256,8 +265,7 @@ export class LaneScene {
   private returnBall(onDone: () => void) {
     const t0 = this.ball.body.translation()
     const startVec = new THREE.Vector3(t0.x, t0.y, t0.z)
-    const radius = this.ball.type === 'schwer' ? BALL_RADIUS_HEAVY : BALL_RADIUS_LIGHT
-    const endVec = new THREE.Vector3(0, radius + 0.05, START_Z)
+    const endVec = new THREE.Vector3(0, BALL_RADIUS + 0.05, START_Z)
     this.ball.body.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true)
     this.animator.play(
       2.0,
@@ -267,7 +275,7 @@ export class LaneScene {
       },
       () => {
         this.ball.body.setBodyType(this.rapier.RigidBodyType.Dynamic, true)
-        this.ball.reset(radius)
+        this.ball.reset()
         this.character?.resetPose()
         this.cameraRig.tweenTo(PRE_THROW_POS, PRE_THROW_LOOK, 0.6)
         this.throwPhase = 'idle'

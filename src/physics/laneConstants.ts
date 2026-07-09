@@ -12,8 +12,8 @@ export const SETTLE_LINVEL_THRESHOLD = 0.05
 export const SETTLE_ANGVEL_THRESHOLD = 0.08
 export const SETTLE_DURATION_MS = 500
 
-export const BALL_RADIUS_LIGHT = 0.13
-export const BALL_RADIUS_HEAVY = 0.15
+export const BALL_RADIUS = 0.14
+export const BALL_MASS = 1.3
 
 export const PIN_RADIUS = 0.06
 export const PIN_HEIGHT = 0.38

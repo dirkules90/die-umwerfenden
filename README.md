@@ -81,6 +81,9 @@ Alle Teile 1–20 sind umgesetzt; ein paar Punkte im Detail:
 - **Erweiterungen aus Teil 21** (Tag-/Nachtmodus, Wetter, Online-Highscores, weitere
   Kameraperspektive, König-Kegel-Sonderregel etc.) sind wie im Lastenheft festgelegt **nicht**
   Teil dieses ersten Entwicklungsumfangs.
+- **Kugelauswahl** (Teil 4.5): Auf Wunsch des Auftraggebers nach dem ersten Praxistest wurde die
+  Wahl zwischen leichter und schwerer Kugel entfernt, um das Spiel weniger verwirrend zu machen.
+  Es gibt jetzt nur noch eine einzige Kugel mit fest eingestellten Wurfeigenschaften.
 
 ## Lizenz / Datenschutz
 

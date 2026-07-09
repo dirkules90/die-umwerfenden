@@ -30,8 +30,8 @@ export function renderAvatarThumbnail(config: AvatarConfig, size = 160): string 
   scene.add(model.group)
 
   const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 10)
-  camera.position.set(0, 1.55, 0.85)
-  camera.lookAt(0, 1.42, 0)
+  camera.position.set(0, 1.4, 0.78)
+  camera.lookAt(0, 1.3, 0)
 
   renderer.render(scene, camera)
   const url = renderer.domElement.toDataURL('image/png')

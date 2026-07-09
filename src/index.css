@@ -279,39 +279,6 @@ button {
   padding: 0.15rem 0;
 }
 
-.hud-bottom {
-  position: absolute;
-  bottom: env(safe-area-inset-bottom, 0.6rem);
-  left: 0;
-  right: 0;
-  display: flex;
-  justify-content: center;
-  gap: 0.8rem;
-}
-
-.ball-select-btn {
-  border-radius: 999px;
-  padding: 0.7rem 1.1rem;
-  border: 3px solid transparent;
-  background: rgba(0, 0, 0, 0.45);
-  color: white;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  min-height: 44px;
-}
-
-.ball-select-btn.active {
-  border-color: #7cffb0;
-}
-
-.ball-dot {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-}
-
 .power-meter-wrap {
   position: absolute;
   left: 1rem;

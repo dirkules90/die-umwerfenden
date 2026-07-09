@@ -20,6 +20,10 @@ function toonMat(color: number, roughness = 0.9): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.05, flatShading: false })
 }
 
+// Mittelpunkt der Betonbahn (ohne Anlaufbereich) entlang der Z-Achse: Die Bahn reicht vom
+// Kegelstand bis zum Anlaufbereich, dessen vorderes Ende bei START_Z liegt.
+const LANE_CENTER_Z = START_Z - LANE_LENGTH / 2
+
 export class Environment {
   group = new THREE.Group()
 
@@ -70,11 +74,10 @@ export class Environment {
 
   private buildLane() {
     const laneWidth = LANE_HALF_WIDTH * 2
-    const totalLen = LANE_LENGTH + RUNUP_LENGTH
-    const laneGeo = new THREE.BoxGeometry(laneWidth, 0.08, totalLen)
+    const laneGeo = new THREE.BoxGeometry(laneWidth, 0.08, LANE_LENGTH)
     const laneMat = toonMat(COLORS.concrete, 0.85)
     const lane = new THREE.Mesh(laneGeo, laneMat)
-    lane.position.set(0, 0.0, -(LANE_LENGTH / 2 - RUNUP_LENGTH / 2) + 0)
+    lane.position.set(0, 0.0, LANE_CENTER_Z)
     lane.receiveShadow = true
     lane.castShadow = false
     this.group.add(lane)
@@ -105,16 +108,16 @@ export class Environment {
         new THREE.BoxGeometry(GUTTER_HALF_OUTER - LANE_HALF_WIDTH, 0.06, LANE_LENGTH),
         toonMat(COLORS.gravel, 1),
       )
-      gutter.position.set(side * (LANE_HALF_WIDTH + (GUTTER_HALF_OUTER - LANE_HALF_WIDTH) / 2), -0.01, 0)
+      gutter.position.set(side * (LANE_HALF_WIDTH + (GUTTER_HALF_OUTER - LANE_HALF_WIDTH) / 2), -0.01, LANE_CENTER_Z)
       gutter.receiveShadow = true
       this.group.add(gutter)
 
-      // Metallschienen.
+      // Metallschienen entlang der gesamten Bahn inkl. Anlaufbereich.
       const rail = new THREE.Mesh(
         new THREE.BoxGeometry(0.03, 0.05, totalLen),
         new THREE.MeshStandardMaterial({ color: COLORS.metal, metalness: 0.6, roughness: 0.4 }),
       )
-      rail.position.set(side * LANE_HALF_WIDTH, 0.05, -(LANE_LENGTH / 2 - RUNUP_LENGTH / 2))
+      rail.position.set(side * LANE_HALF_WIDTH, 0.05, LANE_CENTER_Z)
       this.group.add(rail)
     }
   }

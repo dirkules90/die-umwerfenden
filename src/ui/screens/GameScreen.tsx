@@ -9,14 +9,13 @@ import { useDragShoot } from '../hooks/useDragShoot'
 import { useLeverDrag } from '../hooks/useLeverDrag'
 import { AchievementBanner } from '../components/AchievementBanner'
 import { ConfettiOverlay } from '../components/ConfettiOverlay'
+import { FullscreenButton } from '../components/FullscreenButton'
 import type { DigitSlot } from '../../game/types'
 
 const SLOT_LABELS: Record<DigitSlot, string> = { hundert: 'Hunderter', zehn: 'Zehner', einer: 'Einer' }
 
 export function GameScreen() {
   const session = useGameStore((s) => s.session)
-  const ballType = useGameStore((s) => s.ballType)
-  const setBallType = useGameStore((s) => s.setBallType)
   const submitThrowResult = useGameStore((s) => s.submitThrowResult)
   const chooseDigit = useGameStore((s) => s.chooseDigit)
   const pullLever = useGameStore((s) => s.pullLever)
@@ -45,7 +44,7 @@ export function GameScreen() {
     const scene = new LaneScene(canvasRef.current)
     sceneRef.current = scene
     let cancelled = false
-    scene.init(ballType).then(() => {
+    scene.init().then(() => {
       if (cancelled) return
       const el = containerRef.current
       if (el) scene.resize(el.clientWidth, el.clientHeight)
@@ -94,7 +93,7 @@ export function GameScreen() {
     disabled: !sceneReady || !session || session.phase !== 'idle' || inFlight,
     onAimStart: () => {
       if (!sceneRef.current || !session) return
-      sceneRef.current.prepareBall(ballType)
+      sceneRef.current.resetBall()
       sceneRef.current.beginAimPhase()
     },
     onAimUpdate: (pull, angle) => sceneRef.current?.updateAim(pull, angle),
@@ -200,20 +199,6 @@ export function GameScreen() {
             <div className="power-meter-wrap">
               <div className="power-meter-fill" style={{ height: `${dragShoot.aim.pullFraction * 100}%` }} />
             </div>
-            <div className="hud-bottom">
-              <button
-                className={`ball-select-btn ${ballType === 'leicht' ? 'active' : ''}`}
-                onClick={() => setBallType('leicht')}
-              >
-                <span className="ball-dot" style={{ background: '#4c9a3a' }} /> Leicht
-              </button>
-              <button
-                className={`ball-select-btn ${ballType === 'schwer' ? 'active' : ''}`}
-                onClick={() => setBallType('schwer')}
-              >
-                <span className="ball-dot" style={{ background: '#7a3b28' }} /> Schwer
-              </button>
-            </div>
           </>
         )}
 
@@ -305,6 +290,7 @@ export function GameScreen() {
               <button className="btn secondary" onClick={() => openSettings('game')}>
                 Einstellungen
               </button>
+              <FullscreenButton />
               <button
                 className="btn warn"
                 onClick={() => {

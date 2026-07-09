@@ -2,8 +2,6 @@ export type CharacterId = 'daniel' | 'tobias' | 'dirk' | 'fabian' | 'pascal' | '
 
 export type GameMode = 'hoch' | 'niedrig'
 
-export type BallType = 'leicht' | 'schwer'
-
 export type DigitSlot = 'hundert' | 'zehn' | 'einer'
 
 export interface AvatarConfig {
@@ -19,7 +17,6 @@ export interface AvatarConfig {
 
 export interface Throw {
   playerId: CharacterId
-  ballType: BallType
   pinsDown: number
   isGutter: boolean
   resultDigit: number
