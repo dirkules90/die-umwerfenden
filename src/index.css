@@ -432,6 +432,20 @@ button {
   border-bottom: 1px solid rgba(255, 255, 255, 0.15);
 }
 
+/* Die Rangliste hat viele Spalten (#, Spieler, Punkte, drei Bestwerte, Partien) - ohne
+   Mindestbreite quetschen sich die Spaltenüberschriften auf schmalen Bildschirmen um und
+   jede Zeile wird dadurch mehrzeilig hoch, statt die Tabelle seitlich scrollbar zu lassen
+   (siehe umgebendes Panel mit overflowX: auto). Feste Mindestbreite + kein Zeilenumbruch
+   erzwingt stattdessen seitliches Scrollen, sodass jede Zeile kompakt bleibt. */
+.leaderboard-table {
+  min-width: 40rem;
+}
+
+.leaderboard-table td,
+.leaderboard-table th {
+  white-space: nowrap;
+}
+
 .settings-row {
   display: flex;
   align-items: center;
