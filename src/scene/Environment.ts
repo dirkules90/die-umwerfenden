@@ -1,6 +1,5 @@
 import * as THREE from 'three'
 import {
-  GUTTER_DEPTH,
   GUTTER_HALF_OUTER,
   LANE_HALF_WIDTH,
   LANE_LENGTH,
@@ -114,22 +113,21 @@ export class Environment {
   private buildGutters() {
     const totalLen = LANE_LENGTH + RUNUP_LENGTH
     for (const side of [-1, 1]) {
+      // Rein optische Rinnentiefe, bewusst unabhängig von der tieferen Physik-Rinne in
+      // LaneScene.ts (die dort für den echten Rinnen-Absatz sorgt): eine Kieselfläche, die so
+      // tief wie die Physik läge, würde unter der Wiesenebene (bei y=-0.01) verschwinden und
+      // grün statt kiesfarben durchscheinen.
       const gutter = new THREE.Mesh(
         new THREE.BoxGeometry(GUTTER_HALF_OUTER - LANE_HALF_WIDTH, 0.06, LANE_LENGTH),
         toonMat(COLORS.gravel, 1),
       )
-      gutter.position.set(
-        side * (LANE_HALF_WIDTH + (GUTTER_HALF_OUTER - LANE_HALF_WIDTH) / 2),
-        -GUTTER_DEPTH - 0.03,
-        LANE_CENTER_Z,
-      )
+      gutter.position.set(side * (LANE_HALF_WIDTH + (GUTTER_HALF_OUTER - LANE_HALF_WIDTH) / 2), -0.01, LANE_CENTER_Z)
       gutter.receiveShadow = true
       this.group.add(gutter)
 
-      // Absatz-Stufe zwischen Bahn und Rinne: macht sichtbar, dass die Rinne tiefer liegt (echte
-      // Kante, in die eine Kugel hineinfällt, statt nur eine Reibungsgrenze).
-      const step = new THREE.Mesh(new THREE.BoxGeometry(0.03, GUTTER_DEPTH, LANE_LENGTH), toonMat(COLORS.gravel, 0.85))
-      step.position.set(side * LANE_HALF_WIDTH, -GUTTER_DEPTH / 2, LANE_CENTER_Z)
+      // Kleine Absatz-Stufe zwischen Bahn und Rinne, rein zur Andeutung der Kante.
+      const step = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.02, LANE_LENGTH), toonMat(COLORS.gravel, 0.85))
+      step.position.set(side * LANE_HALF_WIDTH, -0.01, LANE_CENTER_Z)
       step.receiveShadow = true
       this.group.add(step)
 
@@ -144,7 +142,7 @@ export class Environment {
       // Äußere Rinnenkante: hält die Kugel sichtbar in der Rinne (siehe passende Physik-Wand
       // in LaneScene.ts), statt dass sie einfach Richtung Wiese weiterrollt.
       const curb = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.15, LANE_LENGTH), toonMat(COLORS.gravel, 0.8))
-      curb.position.set(side * GUTTER_HALF_OUTER, -GUTTER_DEPTH + 0.075, LANE_CENTER_Z)
+      curb.position.set(side * GUTTER_HALF_OUTER, 0.05, LANE_CENTER_Z)
       curb.castShadow = true
       curb.receiveShadow = true
       this.group.add(curb)
