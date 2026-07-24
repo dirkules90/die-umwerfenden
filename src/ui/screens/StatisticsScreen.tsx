@@ -50,6 +50,10 @@ export function StatisticsScreen() {
               <td>{stats.bestLow !== null ? String(stats.bestLow).padStart(3, '0') : '–'}</td>
             </tr>
             <tr>
+              <td>Bester Wert „Tannenbaum” (Würfe)</td>
+              <td>{stats.bestTannenbaum !== null ? stats.bestTannenbaum : '–'}</td>
+            </tr>
+            <tr>
               <td>Durchschnitt Hoch</td>
               <td>{avgHigh}</td>
             </tr>

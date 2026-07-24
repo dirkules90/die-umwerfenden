@@ -1,5 +1,14 @@
 import { create } from 'zustand'
-import type { CharacterId, DigitSlot, GameMode, GameSession, PlayerStatistics, RoundResult, Settings } from '../game/types'
+import type {
+  CharacterId,
+  DigitSlot,
+  GameMode,
+  GameSession,
+  PlayerStatistics,
+  RoundResult,
+  Settings,
+  TannenbaumSession,
+} from '../game/types'
 import {
   ballReturned,
   beginNextTurn,
@@ -10,13 +19,23 @@ import {
   leverPulled,
   resolveThrow,
 } from '../game/gameStateMachine'
+import {
+  createTannenbaumSession,
+  resolveTannenbaumThrow,
+  tannenbaumBallReturned,
+  tannenbaumLeverAnimationDone,
+  tannenbaumLeverPulled,
+} from '../game/tannenbaumMachine'
 import { ACHIEVEMENT_DEFS, grantAchievement, hasAchievement } from '../game/achievements'
+import { emptyDailyRecord, type DailyRecords } from '../game/dailyWinner'
 import {
   emptyStatistics,
   loadAllStatistics,
+  loadDailyRecords,
   loadSettings,
   resetAllStatistics,
   saveAllStatistics,
+  saveDailyRecords,
   saveSettings,
 } from '../storage/localStorageService'
 import { soundManager } from '../audio/soundManager'
@@ -27,6 +46,7 @@ export type Screen =
   | 'playerSelect'
   | 'modeSelect'
   | 'game'
+  | 'tannenbaum'
   | 'leaderboard'
   | 'statistics'
   | 'settings'
@@ -49,12 +69,15 @@ interface GameStore {
   settingsReturnTo: Screen
   selectedPlayer: CharacterId | null
   session: GameSession | null
+  tannenbaumSession: TannenbaumSession | null
   statistics: Record<CharacterId, PlayerStatistics>
+  dailyRecords: DailyRecords
   settings: Settings
   achievementBanner: AchievementBanner | null
   perGameCounters: Partial<Record<CharacterId, PerGameCounters>>
   pendingAllNine: boolean
   finalResult: RoundResult | null
+  tannenbaumResult: { throwCount: number; isBest: boolean } | null
   pauseMenuOpen: boolean
 
   goTo: (screen: Screen) => void
@@ -69,6 +92,11 @@ interface GameStore {
   leverAnimationComplete: () => void
   ballReturnComplete: () => void
   advanceAfterSwitch: () => void
+  startTannenbaum: () => void
+  submitTannenbaumThrow: (pinsDown: number) => void
+  pullTannenbaumLever: () => void
+  tannenbaumLeverAnimationComplete: () => void
+  tannenbaumBallReturnComplete: () => void
   dismissAchievementBanner: () => void
   resetStatistics: () => void
   updateSettings: (partial: Partial<Settings>) => void
@@ -84,12 +112,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
   settingsReturnTo: 'start',
   selectedPlayer: null,
   session: null,
+  tannenbaumSession: null,
   statistics: loadAllStatistics(),
+  dailyRecords: loadDailyRecords(),
   settings: loadSettings(),
   achievementBanner: null,
   perGameCounters: {},
   pendingAllNine: false,
   finalResult: null,
+  tannenbaumResult: null,
   pauseMenuOpen: false,
 
   setPauseMenuOpen: (open) => set({ pauseMenuOpen: open }),
@@ -211,10 +242,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   ballReturnComplete: () => {
-    const { session, statistics } = get()
+    const { session, statistics, dailyRecords } = get()
     if (!session) return
     const { session: next, effects } = ballReturned(session)
     let updatedStats = { ...statistics }
+    let updatedDaily = dailyRecords
     let finalResult: RoundResult | null = null
 
     for (const effect of effects) {
@@ -255,6 +287,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
             ps = grantAchievement(ps, 'stammgast')
           }
           updatedStats = { ...updatedStats, [result.playerId]: ps }
+
+          const dayRec = { ...emptyDailyRecord(), ...updatedDaily[result.playerId] }
+          if (next.mode === 'hoch') {
+            dayRec.bestHigh = dayRec.bestHigh === null ? v : Math.max(dayRec.bestHigh, v)
+          } else {
+            dayRec.bestLow = dayRec.bestLow === null ? v : Math.min(dayRec.bestLow, v)
+          }
+          updatedDaily = { ...updatedDaily, [result.playerId]: dayRec }
+          saveDailyRecords(updatedDaily)
         }
         saveAllStatistics(updatedStats)
         soundManager.stopAmbientLoop()
@@ -264,6 +305,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({
       session: next,
       statistics: updatedStats,
+      dailyRecords: updatedDaily,
       finalResult: finalResult ?? get().finalResult,
     })
   },
@@ -273,6 +315,75 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!session) return
     soundManager.playPlayerSwitch()
     set({ session: beginNextTurn(session) })
+  },
+
+  startTannenbaum: () => {
+    const { selectedPlayer } = get()
+    if (!selectedPlayer) return
+    set({
+      tannenbaumSession: createTannenbaumSession(selectedPlayer),
+      screen: 'tannenbaum',
+      tannenbaumResult: null,
+    })
+    soundManager.ensureContext()
+    soundManager.startAmbientLoop()
+  },
+
+  submitTannenbaumThrow: (pinsDown) => {
+    const { tannenbaumSession, statistics, dailyRecords } = get()
+    if (!tannenbaumSession) return
+    soundManager.playPinsFall(pinsDown)
+    const { session: next, completed } = resolveTannenbaumThrow(tannenbaumSession, pinsDown)
+
+    if (completed) {
+      soundManager.playVictory()
+      const player = next.playerId
+      const throwCount = next.throwCount
+
+      let ps = statsFor(statistics, player)
+      const isBest = ps.bestTannenbaum === null || throwCount < ps.bestTannenbaum
+      ps = { ...ps, bestTannenbaum: isBest ? throwCount : ps.bestTannenbaum }
+      const updatedStats = { ...statistics, [player]: ps }
+      saveAllStatistics(updatedStats)
+
+      const dayRec = { ...emptyDailyRecord(), ...dailyRecords[player] }
+      dayRec.bestTannenbaum = dayRec.bestTannenbaum === null ? throwCount : Math.min(dayRec.bestTannenbaum, throwCount)
+      const updatedDaily = { ...dailyRecords, [player]: dayRec }
+      saveDailyRecords(updatedDaily)
+
+      soundManager.stopAmbientLoop()
+      set({
+        tannenbaumSession: next,
+        statistics: updatedStats,
+        dailyRecords: updatedDaily,
+        tannenbaumResult: { throwCount, isBest },
+      })
+    } else {
+      set({ tannenbaumSession: next })
+    }
+  },
+
+  pullTannenbaumLever: () => {
+    const { tannenbaumSession, settings } = get()
+    if (!tannenbaumSession) return
+    soundManager.playLeverPull()
+    vibrate(35, settings.hapticsEnabled)
+    set({ tannenbaumSession: tannenbaumLeverPulled(tannenbaumSession) })
+    window.setTimeout(() => soundManager.playGearMechanism(), 150)
+  },
+
+  tannenbaumLeverAnimationComplete: () => {
+    const { tannenbaumSession } = get()
+    if (!tannenbaumSession) return
+    soundManager.playPinUpright()
+    soundManager.playBallReturn()
+    set({ tannenbaumSession: tannenbaumLeverAnimationDone(tannenbaumSession) })
+  },
+
+  tannenbaumBallReturnComplete: () => {
+    const { tannenbaumSession } = get()
+    if (!tannenbaumSession) return
+    set({ tannenbaumSession: tannenbaumBallReturned(tannenbaumSession) })
   },
 
   dismissAchievementBanner: () => set({ achievementBanner: null }),
@@ -291,7 +402,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   backToStartFromGameOver: () => {
-    set({ session: null, selectedPlayer: null, screen: 'start', finalResult: null, pauseMenuOpen: false })
+    set({
+      session: null,
+      tannenbaumSession: null,
+      selectedPlayer: null,
+      screen: 'start',
+      finalResult: null,
+      tannenbaumResult: null,
+      pauseMenuOpen: false,
+    })
   },
 }))
 

@@ -9,6 +9,7 @@ import {
   PIN_HEIGHT,
   PIN_LAYOUT,
   PIN_STAND_Z,
+  RETURN_CHANNEL_X,
   SETTLE_ANGVEL_THRESHOLD,
   SETTLE_DURATION_MS,
   SETTLE_LINVEL_THRESHOLD,
@@ -290,6 +291,12 @@ export class LaneScene {
             remaining -= 1
             if (remaining <= 0) {
               for (const p of this.pins) {
+                // Harte, exakte Rücksetzung statt sich auf den letzten Tween-Frame zu verlassen:
+                // dessen kinematisches Ziel würde sonst erst mit dem nächsten world.step()
+                // übernommen, was gelegentlich einen nicht ganz aufgerichteten Kegel übrig ließ
+                // (Bug: "Kegel bleiben nach Hebelzug liegen").
+                p.body.setTranslation({ x: p.startPosition.x, y: p.startPosition.y, z: p.startPosition.z }, true)
+                p.body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true)
                 p.body.setBodyType(this.rapier.RigidBodyType.Dynamic, true)
                 p.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
                 p.body.setAngvel({ x: 0, y: 0, z: 0 }, true)
@@ -305,12 +312,28 @@ export class LaneScene {
   private returnBall(onDone: () => void) {
     const t0 = this.ball.body.translation()
     const startVec = new THREE.Vector3(t0.x, t0.y, t0.z)
-    const endVec = new THREE.Vector3(0, BALL_RADIUS + 0.05, START_Z)
+    const channelY = BALL_RADIUS + 0.07
+    // Statt geradewegs zu teleportieren, rollt die Kugel sichtbar über die Rückführungsrinne
+    // neben dem Hebel-Gestänge zurück zum Spieler (Teil 9.4 Ergänzung).
+    const waypoints = [
+      startVec,
+      new THREE.Vector3(RETURN_CHANNEL_X, channelY, PIN_STAND_Z - 0.6),
+      new THREE.Vector3(RETURN_CHANNEL_X, channelY, START_Z - 1.2),
+      new THREE.Vector3(0, BALL_RADIUS + 0.05, START_Z),
+    ]
+    const segLengths = waypoints.slice(1).map((p, i) => p.distanceTo(waypoints[i]))
+    const totalLength = segLengths.reduce((a, b) => a + b, 0) || 1
+    const cumulative = segLengths.reduce<number[]>((acc, l) => [...acc, acc[acc.length - 1] + l], [0])
+
     this.ball.body.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true)
     this.animator.play(
-      2.0,
+      2.6,
       (t) => {
-        const pos = new THREE.Vector3().lerpVectors(startVec, endVec, t)
+        const dist = t * totalLength
+        let seg = 0
+        while (seg < segLengths.length - 1 && dist > cumulative[seg + 1]) seg++
+        const segT = segLengths[seg] > 0 ? (dist - cumulative[seg]) / segLengths[seg] : 1
+        const pos = new THREE.Vector3().lerpVectors(waypoints[seg], waypoints[seg + 1], THREE.MathUtils.clamp(segT, 0, 1))
         this.ball.body.setNextKinematicTranslation(pos)
       },
       () => {

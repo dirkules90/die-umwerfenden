@@ -45,6 +45,8 @@ export interface PlayerStatistics {
   countHigh: number
   totalScoreLow: number
   countLow: number
+  /** Wenigste Würfe, um den Tannenbaum vollständig abzuhaken (Teil 10.5, niedriger ist besser). */
+  bestTannenbaum: number | null
   perfectThrows: number
   gutterThrows: number
   longestPerfectStreak: number
@@ -80,5 +82,14 @@ export interface GameSession {
   results: RoundResult[]
   currentDigits: Partial<Record<DigitSlot, number>>
   pendingDigit: number | null
+  phase: GamePhase
+}
+
+/** Sitzung des Tannenbaum-Spiels (Teil 10.5): ein Spieler wirft, bis alle Zahlen 2-7
+ * abgehakt sind. Ziel ist die geringste Wurfanzahl. */
+export interface TannenbaumSession {
+  playerId: CharacterId
+  remaining: Record<number, number>
+  throwCount: number
   phase: GamePhase
 }

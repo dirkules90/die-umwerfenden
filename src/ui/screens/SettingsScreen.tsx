@@ -14,7 +14,7 @@ export function SettingsScreen() {
   const [confirmReset, setConfirmReset] = useState(false)
 
   function close() {
-    if (settingsReturnTo === 'game') setPauseMenuOpen(true)
+    if (settingsReturnTo === 'game' || settingsReturnTo === 'tannenbaum') setPauseMenuOpen(true)
     goTo(settingsReturnTo)
   }
 

@@ -9,6 +9,9 @@ import { SettingsScreen } from './ui/screens/SettingsScreen'
 
 // 3D-/Physik-Stack (Three.js + Rapier.js) erst laden, wenn tatsächlich gespielt wird (Teil 16.2).
 const GameScreen = lazy(() => import('./ui/screens/GameScreen').then((m) => ({ default: m.GameScreen })))
+const TannenbaumScreen = lazy(() =>
+  import('./ui/screens/TannenbaumScreen').then((m) => ({ default: m.TannenbaumScreen })),
+)
 
 function ScreenRouter() {
   const screen = useGameStore((s) => s.screen)
@@ -23,6 +26,12 @@ function ScreenRouter() {
       return (
         <Suspense fallback={<div className="screen">Lade Kegelbahn…</div>}>
           <GameScreen />
+        </Suspense>
+      )
+    case 'tannenbaum':
+      return (
+        <Suspense fallback={<div className="screen">Lade Kegelbahn…</div>}>
+          <TannenbaumScreen />
         </Suspense>
       )
     case 'leaderboard':

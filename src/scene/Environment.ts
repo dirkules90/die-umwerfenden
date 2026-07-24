@@ -1,5 +1,13 @@
 import * as THREE from 'three'
-import { GUTTER_HALF_OUTER, LANE_HALF_WIDTH, LANE_LENGTH, PIN_STAND_Z, RUNUP_LENGTH, START_Z } from '../physics/laneConstants'
+import {
+  GUTTER_HALF_OUTER,
+  LANE_HALF_WIDTH,
+  LANE_LENGTH,
+  PIN_STAND_Z,
+  RETURN_CHANNEL_X,
+  RUNUP_LENGTH,
+  START_Z,
+} from '../physics/laneConstants'
 
 // Farbpalette gemäß Teil 5.2 / 22.3.
 const COLORS = {
@@ -33,7 +41,9 @@ export class Environment {
     this.buildLane()
     this.buildGutters()
     this.buildPinStandStructure()
+    this.buildCourtyard()
     this.buildClubhouse()
+    this.buildReturnChannel()
     this.buildTrees()
     this.buildBenches()
     this.buildFootballPlaceholder()
@@ -129,6 +139,28 @@ export class Environment {
     }
   }
 
+  /** Sichtbare Rückführungsrinne genau neben dem Hebel-Gestänge: die Kugel rollt hier nach dem
+   * Hebelzug erkennbar vom Kegelstand zurück zum Spieler, statt einfach zu teleportieren. */
+  private buildReturnChannel() {
+    const startZ = PIN_STAND_Z - 0.6
+    const endZ = START_Z - 1.2
+    const length = endZ - startZ
+    const centerZ = (startZ + endZ) / 2
+    const metalMat = new THREE.MeshStandardMaterial({ color: COLORS.metal, metalness: 0.5, roughness: 0.45 })
+
+    const base = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.05, length), metalMat)
+    base.position.set(RETURN_CHANNEL_X, 0.02, centerZ)
+    base.receiveShadow = true
+    this.group.add(base)
+
+    for (const side of [-1, 1]) {
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.14, length), metalMat)
+      wall.position.set(RETURN_CHANNEL_X + side * 0.17, 0.09, centerZ)
+      wall.castShadow = true
+      this.group.add(wall)
+    }
+  }
+
   private buildPinStandStructure() {
     const archGroup = new THREE.Group()
     const postMat = toonMat(COLORS.wood, 0.8)
@@ -153,6 +185,21 @@ export class Environment {
     archGroup.add(backWall)
 
     this.group.add(archGroup)
+  }
+
+  /** Gepflasterter Hof zwischen der Fangwand am Kegelstand und dem Vereinsheim, damit dort
+   * kein Grasstreifen den optischen Zusammenhang zwischen Bahn und Häuschen unterbricht. */
+  private buildCourtyard() {
+    const backWallRearZ = PIN_STAND_Z - 1.2
+    const clubhouseFrontZ = PIN_STAND_Z - 4
+    const length = backWallRearZ - clubhouseFrontZ
+    const courtyard = new THREE.Mesh(
+      new THREE.BoxGeometry(6.5, 0.06, length),
+      toonMat(COLORS.concrete, 0.85),
+    )
+    courtyard.position.set(0, 0, (backWallRearZ + clubhouseFrontZ) / 2)
+    courtyard.receiveShadow = true
+    this.group.add(courtyard)
   }
 
   private buildClubhouse() {

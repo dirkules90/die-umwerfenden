@@ -15,6 +15,10 @@ export const SETTLE_DURATION_MS = 500
 export const BALL_RADIUS = 0.14
 export const BALL_MASS = 1.3
 
+/** X-Position der sichtbaren Rückführungsrinne, direkt neben dem Hebel-Gestänge zum
+ * Kegelstand: die Kugel rollt dort nach dem Hebelzug sichtbar zurück statt zu teleportieren. */
+export const RETURN_CHANNEL_X = GUTTER_HALF_OUTER + 0.75
+
 export const PIN_RADIUS = 0.06
 export const PIN_HEIGHT = 0.38
 

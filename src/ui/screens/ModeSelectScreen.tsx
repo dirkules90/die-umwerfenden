@@ -3,10 +3,18 @@ import { useGameStore } from '../../state/gameStore'
 import { ControlsHelp } from '../components/ControlsHelp'
 import type { GameMode } from '../../game/types'
 
+type SelectableMode = GameMode | 'tannenbaum'
+
 export function ModeSelectScreen() {
   const goTo = useGameStore((s) => s.goTo)
   const startGame = useGameStore((s) => s.startGame)
-  const [mode, setMode] = useState<GameMode>('hoch')
+  const startTannenbaum = useGameStore((s) => s.startTannenbaum)
+  const [mode, setMode] = useState<SelectableMode>('hoch')
+
+  function handleStart() {
+    if (mode === 'tannenbaum') startTannenbaum()
+    else startGame(mode)
+  }
 
   return (
     <div className="screen">
@@ -27,10 +35,14 @@ export function ModeSelectScreen() {
           <h3>↓ Niedrige Hausnummer</h3>
           <p>Rinne zählt als 9. Ziel: möglichst niedrige Zahl.</p>
         </button>
+        <button className={`mode-card ${mode === 'tannenbaum' ? 'selected' : ''}`} onClick={() => setMode('tannenbaum')}>
+          <h3>🎄 Tannenbaum</h3>
+          <p>Hake alle Zahlen 2 bis 7 ab. Ziel: möglichst wenige Würfe.</p>
+        </button>
       </div>
 
       <div style={{ display: 'flex', gap: '0.8rem' }}>
-        <button className="btn" onClick={() => startGame(mode)}>
+        <button className="btn" onClick={handleStart}>
           Spiel starten
         </button>
         <ControlsHelp />

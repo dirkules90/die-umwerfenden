@@ -1,9 +1,10 @@
 import * as THREE from 'three'
-import { GUTTER_HALF_OUTER, PIN_FALLEN_ANGLE_DEG } from './laneConstants'
+import { LANE_HALF_WIDTH, PIN_FALLEN_ANGLE_DEG } from './laneConstants'
 
-/** Rinnenlogik (Teil 8.3): Kugel gilt als „im Aus”, sobald sie die Grenzlinie überschreitet. */
+/** Rinnenlogik (Teil 8.3): Kugel gilt als „im Aus”, sobald sie die Bahnkante verlassen hat -
+ * unabhängig davon, wo genau sie innerhalb der Rinne zum Stehen kommt. */
 export function isInGutter(ballX: number): boolean {
-  return Math.abs(ballX) > GUTTER_HALF_OUTER * 0.85
+  return Math.abs(ballX) > LANE_HALF_WIDTH
 }
 
 /** Ein Kegel gilt als „gefallen”, sobald sein Neigungswinkel den Schwellenwert überschreitet (Teil 8.4). */

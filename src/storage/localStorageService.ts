@@ -1,7 +1,9 @@
+import type { DailyRecords } from '../game/dailyWinner'
 import type { CharacterId, PlayerStatistics, Settings } from '../game/types'
 
 const STATS_KEY = 'kegeln-lembeck:stats:v1'
 const SETTINGS_KEY = 'kegeln-lembeck:settings:v1'
+const DAILY_KEY = 'kegeln-lembeck:daily:v1'
 
 export function emptyStatistics(): PlayerStatistics {
   return {
@@ -12,6 +14,7 @@ export function emptyStatistics(): PlayerStatistics {
     countHigh: 0,
     totalScoreLow: 0,
     countLow: 0,
+    bestTannenbaum: null,
     perfectThrows: 0,
     gutterThrows: 0,
     longestPerfectStreak: 0,
@@ -55,4 +58,27 @@ export function saveSettings(settings: Settings): void {
 
 export function resetAllStatistics(): void {
   localStorage.removeItem(STATS_KEY)
+}
+
+function todayKey(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** Tagesrekorde für den Tagessieger: werden automatisch verworfen, sobald ein neuer Tag
+ * beginnt - am Anfang jedes Tages hat also niemand Punkte (Teil: Tagessieger). */
+export function loadDailyRecords(): DailyRecords {
+  try {
+    const raw = localStorage.getItem(DAILY_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as { date: string; records: DailyRecords }
+    if (parsed.date !== todayKey()) return {}
+    return parsed.records ?? {}
+  } catch {
+    return {}
+  }
+}
+
+export function saveDailyRecords(records: DailyRecords): void {
+  localStorage.setItem(DAILY_KEY, JSON.stringify({ date: todayKey(), records }))
 }
