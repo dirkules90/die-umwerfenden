@@ -97,16 +97,11 @@ button {
   backdrop-filter: blur(6px);
 }
 
-.title-logo {
-  font-size: clamp(2rem, 6vw, 3.2rem);
-  font-weight: 800;
-  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
-  letter-spacing: -0.5px;
-}
-
 .title-logo-img {
-  height: clamp(4rem, 14vh, 7rem);
+  height: clamp(4rem, 16vh, 8rem);
   width: auto;
+  max-width: 88vw;
+  object-fit: contain;
   filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.35));
 }
 

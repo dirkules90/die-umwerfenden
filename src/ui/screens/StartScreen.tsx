@@ -10,7 +10,6 @@ export function StartScreen() {
   return (
     <div className="screen">
       <img className="title-logo-img" src={`${import.meta.env.BASE_URL}icons/logo.png`} alt="Die Umwerfenden" />
-      <div className="title-logo">Die Umwerfenden</div>
       <p className="subtitle">Die originalgetreue Outdoor-Kegelbahn aus Lembeck.</p>
       <button className="btn" onClick={() => goTo('playerSelect')}>
         Neues Spiel
