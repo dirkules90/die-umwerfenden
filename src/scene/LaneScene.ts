@@ -4,6 +4,7 @@ import { ensureRapierInitialized, createWorld, FIXED_TIMESTEP } from '../physics
 import { isInGutter, isPinFallen } from '../physics/collisions'
 import {
   BALL_RADIUS,
+  GUTTER_DEPTH,
   GUTTER_HALF_OUTER,
   LANE_HALF_WIDTH,
   PIN_HEIGHT,
@@ -86,31 +87,36 @@ export class LaneScene {
     this.scene.add(env.group)
     this.scene.add(this.aimTrajectory)
 
-    // Statische Kollisionsfläche der Bahn.
+    // Statische Kollisionsfläche der Bahn - bewusst exakt auf Bahnbreite begrenzt (nicht mehr
+    // bis weit in die Wiese hinein), damit die Rinne echt tiefer liegen kann (siehe unten) statt
+    // von dieser durchgehenden Fläche auf Bahnniveau "aufgefangen" zu werden.
     const groundBody = this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed())
     this.world.createCollider(
-      this.rapier.ColliderDesc.cuboid(6, 0.05, 20).setTranslation(0, -0.05, 0).setFriction(0.5),
+      this.rapier.ColliderDesc.cuboid(LANE_HALF_WIDTH, 0.05, 20).setTranslation(0, -0.05, 0).setFriction(0.5),
       groundBody,
     )
 
-    // Echte Rinnen (Teil 8.2/8.3): Kies-Boden mit spürbar höherer Reibung bremst die Kugel dort
-    // stärker ab, und eine niedrige Außenwand hält sie in der Rinne fest, statt dass sie einfach
-    // Richtung Wiese weiterrollt.
+    // Echte Rinnen (Teil 8.2/8.3): der Rinnenboden liegt spürbar UNTER dem Bahnniveau (echter
+    // Absatz statt nur ein Reibungsunterschied). Eine Kugel, die über die Bahnkante hinausrollt,
+    // fällt dort hinein und kann aus eigener Kraft nicht mehr zurück auf die Bahn hochrollen -
+    // vorher blieb sie faktisch auf Bahnhöhe und konnte zurückrollen, wodurch ein Rinnenwurf bei
+    // "Niedrige Hausnummer" fälschlich als 0 statt 9 gewertet wurde.
     const gutterHalfWidth = (GUTTER_HALF_OUTER - LANE_HALF_WIDTH) / 2
     for (const side of [-1, 1] as const) {
       const gutterCenterX = side * (LANE_HALF_WIDTH + gutterHalfWidth)
       const gutterFloorBody = this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed())
       this.world.createCollider(
         this.rapier.ColliderDesc.cuboid(gutterHalfWidth, 0.05, 20)
-          .setTranslation(gutterCenterX, -0.049, 0)
+          .setTranslation(gutterCenterX, -GUTTER_DEPTH - 0.05, 0)
           .setFriction(0.55),
         gutterFloorBody,
       )
 
       const wallBody = this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed())
+      const wallHalfHeight = 0.16 + GUTTER_DEPTH / 2
       this.world.createCollider(
-        this.rapier.ColliderDesc.cuboid(0.04, 0.16, 20)
-          .setTranslation(side * GUTTER_HALF_OUTER, 0.14, 0)
+        this.rapier.ColliderDesc.cuboid(0.04, wallHalfHeight, 20)
+          .setTranslation(side * GUTTER_HALF_OUTER, 0.14 - GUTTER_DEPTH / 2, 0)
           .setFriction(0.3)
           .setRestitution(0.1),
         wallBody,

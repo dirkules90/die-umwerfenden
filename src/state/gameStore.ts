@@ -53,6 +53,7 @@ export type Screen =
   | 'game'
   | 'tannenbaum'
   | 'leaderboard'
+  | 'allTime'
   | 'settings'
 
 const TOTAL_ROUNDS = 1
@@ -103,6 +104,7 @@ interface GameStore {
   tannenbaumLeverAnimationComplete: () => void
   tannenbaumBallReturnComplete: () => void
   dismissAchievementBanner: () => void
+  resetTodayOnly: () => void
   resetStatistics: () => void
   updateSettings: (partial: Partial<Settings>) => void
   backToStartFromGameOver: () => void
@@ -428,6 +430,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   dismissAchievementBanner: () => set({ achievementBanner: null }),
+
+  resetTodayOnly: () => {
+    resetDailyRecords()
+    set({ dailyRecords: {} })
+  },
 
   resetStatistics: () => {
     resetAllStatistics()

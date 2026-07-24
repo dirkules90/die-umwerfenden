@@ -15,6 +15,11 @@ export const SETTLE_DURATION_MS = 500
 export const BALL_RADIUS = 0.14
 export const BALL_MASS = 1.3
 
+/** Wie tief die Rinne unter dem Bahnniveau liegt - ein echter Absatz statt nur ein
+ * Reibungsunterschied, damit eine Kugel, die einmal hineingerollt ist, nicht aus eigener
+ * Kraft wieder auf die Bahn zurückrollen kann (Teil 8.2/8.3). */
+export const GUTTER_DEPTH = 0.12
+
 /** X-Position der sichtbaren Rückführungsrinne, direkt neben dem Hebel-Gestänge zum
  * Kegelstand: die Kugel rollt dort nach dem Hebelzug sichtbar zurück statt zu teleportieren. */
 export const RETURN_CHANNEL_X = GUTTER_HALF_OUTER + 0.75
