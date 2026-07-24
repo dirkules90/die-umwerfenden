@@ -149,15 +149,43 @@ export class Environment {
 
   private buildClubhouse() {
     const house = new THREE.Group()
+    const bodyZ = PIN_STAND_Z - 6
     const body = new THREE.Mesh(new THREE.BoxGeometry(6, 3, 4), toonMat(COLORS.clubhouse, 0.9))
-    body.position.set(0, 1.5, PIN_STAND_Z - 6)
+    body.position.set(0, 1.5, bodyZ)
     body.castShadow = true
     house.add(body)
     const roof = new THREE.Mesh(new THREE.ConeGeometry(4.5, 1.6, 4), toonMat(COLORS.roof, 0.8))
     roof.rotation.y = Math.PI / 4
-    roof.position.set(0, 3.8, PIN_STAND_Z - 6)
+    roof.position.set(0, 3.8, bodyZ)
     house.add(roof)
+
+    const sign = this.buildClubhouseSign()
+    sign.position.set(0, 2.25, bodyZ + 2 + 0.02)
+    house.add(sign)
+
     this.group.add(house)
+  }
+
+  /** Schriftzug an der Fassade des Vereinsheims, per Canvas-Textur (kein externer Font nötig). */
+  private buildClubhouseSign(): THREE.Mesh {
+    const canvas = document.createElement('canvas')
+    canvas.width = 1024
+    canvas.height = 160
+    const ctx = canvas.getContext('2d')!
+    ctx.font = 'bold 108px "Segoe UI", Arial, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.lineJoin = 'round'
+    ctx.lineWidth = 10
+    ctx.strokeStyle = '#2a1f18'
+    ctx.strokeText('DIE UMWERFENDEN', canvas.width / 2, canvas.height / 2)
+    ctx.fillStyle = '#f4e9d8'
+    ctx.fillText('DIE UMWERFENDEN', canvas.width / 2, canvas.height / 2)
+
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.colorSpace = THREE.SRGBColorSpace
+    const mat = new THREE.MeshBasicMaterial({ map: texture, transparent: true })
+    return new THREE.Mesh(new THREE.PlaneGeometry(5.2, 0.8), mat)
   }
 
   private buildTrees() {

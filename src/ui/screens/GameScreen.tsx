@@ -4,7 +4,6 @@ import { LaneScene } from '../../scene/LaneScene'
 import { AVATAR_CONFIGS } from '../../characters/avatarConfigs'
 import { currentPlayer } from '../../game/gameStateMachine'
 import { DIGIT_SLOTS, freeSlots } from '../../game/houseNumberRules'
-import { computeRanking } from '../../game/scoring'
 import { useDragShoot } from '../hooks/useDragShoot'
 import { useLeverDrag } from '../hooks/useLeverDrag'
 import { AchievementBanner } from '../components/AchievementBanner'
@@ -21,9 +20,8 @@ export function GameScreen() {
   const pullLever = useGameStore((s) => s.pullLever)
   const leverAnimationComplete = useGameStore((s) => s.leverAnimationComplete)
   const ballReturnComplete = useGameStore((s) => s.ballReturnComplete)
-  const advanceAfterSwitch = useGameStore((s) => s.advanceAfterSwitch)
-  const finalRanking = useGameStore((s) => s.finalRanking)
-  const lastRoundResult = useGameStore((s) => s.lastRoundResult)
+  const finalResult = useGameStore((s) => s.finalResult)
+  const statistics = useGameStore((s) => s.statistics)
   const goTo = useGameStore((s) => s.goTo)
   const backToStartFromGameOver = useGameStore((s) => s.backToStartFromGameOver)
   const pauseMenuOpen = useGameStore((s) => s.pauseMenuOpen)
@@ -134,21 +132,13 @@ export function GameScreen() {
     }
   }, [session?.phase])
 
-  // Spielerwechsel: nächsten Avatar einsetzen und nach kurzer Pause fortfahren.
-  useEffect(() => {
-    if (session?.phase !== 'playerSwitch') return
-    const nextConfig = AVATAR_CONFIGS[currentPlayer(session)]
-    sceneRef.current?.setActiveCharacter(nextConfig)
-    const t = window.setTimeout(() => advanceAfterSwitch(), 900)
-    return () => window.clearTimeout(t)
-  }, [session, advanceAfterSwitch])
-
   if (!session) return null
 
   const player = currentPlayer(session)
   const playerConfig = AVATAR_CONFIGS[player]
   const openSlots = freeSlots(session.currentDigits)
-  const liveRanking = computeRanking(session.results, session.mode).slice(0, 4)
+  const playerStats = statistics[player]
+  const personalBest = session.mode === 'hoch' ? playerStats?.bestHigh : playerStats?.bestLow
 
   return (
     <div className="game-root" ref={containerRef}>
@@ -158,16 +148,13 @@ export function GameScreen() {
         <div className="hud-top-left panel">
           <img className="hud-avatar" src={playerConfig.photoUrl} alt={playerConfig.name} />
           <strong>{playerConfig.name}</strong>
-          <span style={{ opacity: 0.8 }}>
-            · Runde {session.currentRoundIndex + 1}/{session.totalRounds}
-          </span>
         </div>
 
         <div className="hud-top-mid panel">Wurf {session.currentThrowIndex + 1} von 3</div>
 
         <div className="hud-top-right panel">
           {DIGIT_SLOTS.map((slot) => (
-            <span key={slot} style={{ marginLeft: 6, fontWeight: 700 }}>
+            <span key={slot} className="hud-digit">
               {session.currentDigits[slot] ?? '–'}
             </span>
           ))}
@@ -178,15 +165,11 @@ export function GameScreen() {
         </button>
 
         <div className="hud-ranking panel">
-          {liveRanking.length === 0 && <div style={{ opacity: 0.7 }}>Noch keine Ergebnisse</div>}
-          {liveRanking.map((r, i) => (
-            <div className="hud-ranking-row" key={r.playerId}>
-              <span>
-                {i + 1}. {AVATAR_CONFIGS[r.playerId].name}
-              </span>
-              <span>{r.total}</span>
-            </div>
-          ))}
+          <div style={{ opacity: 0.8, fontSize: '0.75rem' }}>Dein Bestwert</div>
+          <div className="hud-ranking-row">
+            <span>{playerConfig.name}</span>
+            <span>{personalBest !== null && personalBest !== undefined ? String(personalBest).padStart(3, '0') : '–'}</span>
+          </div>
         </div>
 
         {session.phase === 'idle' && !inFlight && (
@@ -239,38 +222,19 @@ export function GameScreen() {
           </div>
         )}
 
-        {session.phase === 'playerSwitch' && (
-          <div className="round-result-overlay">
-            {lastRoundResult && (
-              <div className="panel">
-                {AVATAR_CONFIGS[lastRoundResult.playerId].name} erzielt die Hausnummer{' '}
-                <strong>{String(lastRoundResult.houseNumber).padStart(3, '0')}</strong>
-              </div>
-            )}
-            <div className="panel" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <img className="hud-avatar" src={playerConfig.photoUrl} alt={playerConfig.name} />
-              Am Zug: <strong>{playerConfig.name}</strong>
-            </div>
-          </div>
-        )}
-
-        {session.phase === 'gameOver' && finalRanking && (
+        {session.phase === 'gameOver' && finalResult && (
           <div className="game-over-overlay">
             <ConfettiOverlay />
-            <h2>Partie beendet!</h2>
-            <div className="panel" style={{ minWidth: '18rem' }}>
-              {finalRanking.map((r, i) => (
-                <div key={r.playerId} className="hud-ranking-row" style={{ fontSize: '1.1rem' }}>
-                  <span>
-                    {i + 1}. {AVATAR_CONFIGS[r.playerId].name}
-                  </span>
-                  <span>{r.total}</span>
-                </div>
-              ))}
+            <h2>Deine Hausnummer</h2>
+            <div className="panel" style={{ minWidth: '14rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ fontSize: '2.6rem', fontWeight: 800 }}>{String(finalResult.houseNumber).padStart(3, '0')}</div>
+              {personalBest !== null && personalBest !== undefined && (
+                <div style={{ opacity: 0.8 }}>Bestwert: {String(personalBest).padStart(3, '0')}</div>
+              )}
             </div>
             <div style={{ display: 'flex', gap: '0.8rem' }}>
-              <button className="btn" onClick={() => goTo('playerSelect')}>
-                Neue Partie
+              <button className="btn" onClick={() => goTo('modeSelect')}>
+                Nochmal
               </button>
               <button className="btn secondary" onClick={() => goTo('statistics')}>
                 Statistik

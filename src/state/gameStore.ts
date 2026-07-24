@@ -10,7 +10,6 @@ import {
   leverPulled,
   resolveThrow,
 } from '../game/gameStateMachine'
-import { computeRanking } from '../game/scoring'
 import { ACHIEVEMENT_DEFS, grantAchievement, hasAchievement } from '../game/achievements'
 import {
   emptyStatistics,
@@ -32,6 +31,9 @@ export type Screen =
   | 'statistics'
   | 'settings'
 
+const TOTAL_ROUNDS = 1
+const GUTTER_STREAK_FOR_ACHIEVEMENT = 3
+
 interface PerGameCounters {
   gutterCount: number
   perfectStreak: number
@@ -45,24 +47,21 @@ interface AchievementBanner {
 interface GameStore {
   screen: Screen
   settingsReturnTo: Screen
-  selectedPlayers: CharacterId[]
+  selectedPlayer: CharacterId | null
   session: GameSession | null
   statistics: Record<CharacterId, PlayerStatistics>
   settings: Settings
   achievementBanner: AchievementBanner | null
   perGameCounters: Partial<Record<CharacterId, PerGameCounters>>
   pendingAllNine: boolean
-  finalRanking: { playerId: CharacterId; total: number }[] | null
-  lastRoundResult: RoundResult | null
+  finalResult: RoundResult | null
   pauseMenuOpen: boolean
 
   goTo: (screen: Screen) => void
   setPauseMenuOpen: (open: boolean) => void
-  clearLastRoundResult: () => void
   openSettings: (from: Screen) => void
-  togglePlayer: (id: CharacterId) => void
-  reorderPlayers: (order: CharacterId[]) => void
-  startGame: (mode: GameMode, rounds: number) => void
+  selectPlayer: (id: CharacterId) => void
+  startGame: (mode: GameMode) => void
   beginAiming: () => void
   submitThrowResult: (pinsDown: number, isGutter: boolean) => void
   chooseDigit: (slot: DigitSlot) => void
@@ -83,19 +82,17 @@ function statsFor(store: Record<CharacterId, PlayerStatistics>, id: CharacterId)
 export const useGameStore = create<GameStore>((set, get) => ({
   screen: 'start',
   settingsReturnTo: 'start',
-  selectedPlayers: [],
+  selectedPlayer: null,
   session: null,
   statistics: loadAllStatistics(),
   settings: loadSettings(),
   achievementBanner: null,
   perGameCounters: {},
   pendingAllNine: false,
-  finalRanking: null,
-  lastRoundResult: null,
+  finalResult: null,
   pauseMenuOpen: false,
 
   setPauseMenuOpen: (open) => set({ pauseMenuOpen: open }),
-  clearLastRoundResult: () => set({ lastRoundResult: null }),
 
   goTo: (screen) => {
     soundManager.playButtonClick()
@@ -107,27 +104,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({ settingsReturnTo: from, screen: 'settings' })
   },
 
-  togglePlayer: (id) => {
+  selectPlayer: (id) => {
     soundManager.playButtonClick()
-    set((s) => ({
-      selectedPlayers: s.selectedPlayers.includes(id)
-        ? s.selectedPlayers.filter((p) => p !== id)
-        : [...s.selectedPlayers, id],
-    }))
+    set({ selectedPlayer: id })
   },
 
-  reorderPlayers: (order) => set({ selectedPlayers: order }),
-
-  startGame: (mode, rounds) => {
-    const { selectedPlayers } = get()
-    if (selectedPlayers.length === 0) return
-    const counters: Partial<Record<CharacterId, PerGameCounters>> = {}
-    for (const p of selectedPlayers) counters[p] = { gutterCount: 0, perfectStreak: 0 }
+  startGame: (mode) => {
+    const { selectedPlayer } = get()
+    if (!selectedPlayer) return
     set({
-      session: createSession(mode, rounds, selectedPlayers),
+      session: createSession(mode, TOTAL_ROUNDS, [selectedPlayer]),
       screen: 'game',
-      perGameCounters: counters,
-      finalRanking: null,
+      perGameCounters: { [selectedPlayer]: { gutterCount: 0, perfectStreak: 0 } },
+      finalResult: null,
     })
     soundManager.ensureContext()
     soundManager.startAmbientLoop()
@@ -179,7 +168,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       if (effect.type === 'GUTTER') {
         let ps = statsFor(updatedStats, player)
         ps = { ...ps, gutterThrows: ps.gutterThrows + 1 }
-        if (counters.gutterCount >= 5 && !hasAchievement(ps, 'bahnrand-kenner')) {
+        if (counters.gutterCount >= GUTTER_STREAK_FOR_ACHIEVEMENT && !hasAchievement(ps, 'bahnrand-kenner')) {
           ps = grantAchievement(ps, 'bahnrand-kenner')
           banner = { playerId: player, title: 'Bahnrand-Kenner' }
         }
@@ -214,70 +203,48 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   leverAnimationComplete: () => {
-    const { session, statistics } = get()
+    const { session } = get()
     if (!session) return
-    const player = currentPlayer(session)
-    let ps = statsFor(statistics, player)
-    ps = { ...ps, leverPulls: ps.leverPulls + 1 }
-    let banner: AchievementBanner | null = null
-    if (ps.leverPulls >= 100 && !hasAchievement(ps, 'hebel-profi')) {
-      ps = grantAchievement(ps, 'hebel-profi')
-      banner = { playerId: player, title: 'Hebel-Profi' }
-    }
-    const updatedStats = { ...statistics, [player]: ps }
-    saveAllStatistics(updatedStats)
     soundManager.playPinUpright()
     soundManager.playBallReturn()
-    set({
-      session: leverAnimationDone(session),
-      statistics: updatedStats,
-      achievementBanner: banner ?? get().achievementBanner,
-      pendingAllNine: false,
-    })
+    set({ session: leverAnimationDone(session), pendingAllNine: false })
   },
 
   ballReturnComplete: () => {
-    const { session, statistics, perGameCounters } = get()
+    const { session, statistics } = get()
     if (!session) return
     const { session: next, effects } = ballReturned(session)
     let updatedStats = { ...statistics }
-    let finalRanking: { playerId: CharacterId; total: number }[] | null = null
-    let lastRoundResult: RoundResult | null = null
+    let finalResult: RoundResult | null = null
 
     for (const effect of effects) {
       if (effect.type === 'ROUND_COMPLETE') {
         soundManager.playRoundComplete()
-        lastRoundResult = effect.result
       }
       if (effect.type === 'GAME_COMPLETE') {
-        const ranking = computeRanking(next.results, next.mode)
-        finalRanking = ranking.map((r) => ({ playerId: r.playerId, total: r.total }))
+        const result = next.results[next.results.length - 1] ?? null
+        finalResult = result
         soundManager.playVictory()
 
-        for (const r of ranking) {
-          let ps = statsFor(updatedStats, r.playerId)
-          const perRoundValues = next.results.filter((res) => res.playerId === r.playerId).map((res) => res.houseNumber)
+        if (result) {
+          let ps = statsFor(updatedStats, result.playerId)
+          const v = result.houseNumber
           ps = { ...ps, gamesPlayed: ps.gamesPlayed + 1 }
-          for (const v of perRoundValues) {
-            if (next.mode === 'hoch') {
-              ps = {
-                ...ps,
-                bestHigh: ps.bestHigh === null ? v : Math.max(ps.bestHigh, v),
-                totalScoreHigh: ps.totalScoreHigh + v,
-                countHigh: ps.countHigh + 1,
-              }
-            } else {
-              ps = {
-                ...ps,
-                bestLow: ps.bestLow === null ? v : Math.min(ps.bestLow, v),
-                totalScoreLow: ps.totalScoreLow + v,
-                countLow: ps.countLow + 1,
-              }
+          if (next.mode === 'hoch') {
+            ps = {
+              ...ps,
+              bestHigh: ps.bestHigh === null ? v : Math.max(ps.bestHigh, v),
+              totalScoreHigh: ps.totalScoreHigh + v,
+              countHigh: ps.countHigh + 1,
+            }
+          } else {
+            ps = {
+              ...ps,
+              bestLow: ps.bestLow === null ? v : Math.min(ps.bestLow, v),
+              totalScoreLow: ps.totalScoreLow + v,
+              countLow: ps.countLow + 1,
             }
           }
-          const streak = perGameCounters[r.playerId]?.perfectStreak ?? 0
-          ps = { ...ps, longestPerfectStreak: Math.max(ps.longestPerfectStreak, streak) }
-
           if (next.mode === 'hoch' && ps.bestHigh === 999 && !hasAchievement(ps, 'hausnummer-meister')) {
             ps = grantAchievement(ps, 'hausnummer-meister')
           }
@@ -287,12 +254,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           if (ps.gamesPlayed >= 10 && !hasAchievement(ps, 'stammgast')) {
             ps = grantAchievement(ps, 'stammgast')
           }
-          updatedStats = { ...updatedStats, [r.playerId]: ps }
-        }
-        if (ranking.length > 0) {
-          const winnerId = ranking[0].playerId
-          const wps = statsFor(updatedStats, winnerId)
-          updatedStats = { ...updatedStats, [winnerId]: { ...wps, wins: wps.wins + 1 } }
+          updatedStats = { ...updatedStats, [result.playerId]: ps }
         }
         saveAllStatistics(updatedStats)
         soundManager.stopAmbientLoop()
@@ -302,8 +264,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({
       session: next,
       statistics: updatedStats,
-      finalRanking: finalRanking ?? get().finalRanking,
-      lastRoundResult: lastRoundResult ?? get().lastRoundResult,
+      finalResult: finalResult ?? get().finalResult,
     })
   },
 
@@ -330,7 +291,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   backToStartFromGameOver: () => {
-    set({ session: null, selectedPlayers: [], screen: 'start', finalRanking: null, lastRoundResult: null, pauseMenuOpen: false })
+    set({ session: null, selectedPlayer: null, screen: 'start', finalResult: null, pauseMenuOpen: false })
   },
 }))
 

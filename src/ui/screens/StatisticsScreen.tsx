@@ -13,7 +13,6 @@ export function StatisticsScreen() {
   const stats = statistics[selected] ?? emptyStatistics()
   const avgHigh = stats.countHigh > 0 ? (stats.totalScoreHigh / stats.countHigh).toFixed(1) : '–'
   const avgLow = stats.countLow > 0 ? (stats.totalScoreLow / stats.countLow).toFixed(1) : '–'
-  const winRate = stats.gamesPlayed > 0 ? `${Math.round((stats.wins / stats.gamesPlayed) * 100)}%` : '–'
 
   return (
     <div className="screen">
@@ -69,14 +68,6 @@ export function StatisticsScreen() {
             <tr>
               <td>Längste „Alle Neune”-Serie</td>
               <td>{stats.longestPerfectStreak}</td>
-            </tr>
-            <tr>
-              <td>Siegquote</td>
-              <td>{winRate}</td>
-            </tr>
-            <tr>
-              <td>Hebel-Betätigungen</td>
-              <td>{stats.leverPulls}</td>
             </tr>
           </tbody>
         </table>

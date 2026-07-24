@@ -18,8 +18,3 @@ export function houseNumberFromDigits(digits: Partial<Record<DigitSlot, number>>
   const e = digits.einer ?? 0
   return h * 100 + z * 10 + e
 }
-
-/** Sortier-Komparator gemäß Optimierungsziel des Modus: bestes Ergebnis zuerst. */
-export function compareByMode(a: number, b: number, mode: GameMode): number {
-  return mode === 'niedrig' ? a - b : b - a
-}

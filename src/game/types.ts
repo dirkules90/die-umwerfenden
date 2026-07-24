@@ -48,8 +48,6 @@ export interface PlayerStatistics {
   perfectThrows: number
   gutterThrows: number
   longestPerfectStreak: number
-  wins: number
-  leverPulls: number
   achievements: Achievement[]
 }
 
@@ -57,7 +55,6 @@ export interface Settings {
   musicVolume: number
   sfxVolume: number
   hapticsEnabled: boolean
-  defaultRounds: number
 }
 
 export type GamePhase =

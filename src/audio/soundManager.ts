@@ -10,6 +10,27 @@
 
 type NoiseKind = 'white' | 'pink'
 
+// Sommerlich-folkloristische Dauerschleife (Teil 13.4), pentatonisch, damit sie sich trotz
+// Zufälligkeit-freier Synthese nicht dissonant/computerhaft anhört. Freq. in Hz, Dauer in Sekunden.
+const MUSIC_MELODY: { f: number; d: number }[] = [
+  { f: 392, d: 0.5 },
+  { f: 440, d: 0.5 },
+  { f: 494, d: 0.5 },
+  { f: 587, d: 0.75 },
+  { f: 494, d: 0.5 },
+  { f: 440, d: 0.5 },
+  { f: 392, d: 1.0 },
+  { f: 0, d: 0.5 },
+  { f: 440, d: 0.5 },
+  { f: 494, d: 0.5 },
+  { f: 587, d: 0.5 },
+  { f: 659, d: 0.75 },
+  { f: 587, d: 0.5 },
+  { f: 494, d: 0.5 },
+  { f: 440, d: 1.0 },
+  { f: 0, d: 0.75 },
+]
+
 class SoundManager {
   private ctx: AudioContext | null = null
   private musicGain: GainNode | null = null
@@ -19,6 +40,7 @@ class SoundManager {
   private musicVolume = 0.5
   private sfxVolume = 0.8
   private noiseBufferCache = new Map<NoiseKind, AudioBuffer>()
+  private musicTimer: number | null = null
 
   ensureContext(): AudioContext {
     if (!this.ctx) {
@@ -30,9 +52,45 @@ class SoundManager {
       this.sfxGain.gain.value = this.sfxVolume
       this.musicGain.connect(this.ctx.destination)
       this.sfxGain.connect(this.ctx.destination)
+      this.startMusicLoop()
     }
     if (this.ctx.state === 'suspended') void this.ctx.resume()
     return this.ctx
+  }
+
+  /** Läuft leise über Menüs und Spiel hinweg, sobald der erste Nutzer-Tap den AudioContext freigibt. */
+  private startMusicLoop() {
+    if (this.musicTimer !== null) return
+    const totalDuration = MUSIC_MELODY.reduce((sum, n) => sum + n.d, 0)
+    const playSequence = () => {
+      let t = 0
+      for (const note of MUSIC_MELODY) {
+        if (note.f > 0) {
+          window.setTimeout(() => {
+            if (this.musicTimer === null) return
+            this.musicNote(note.f, note.d * 0.9)
+          }, t * 1000)
+        }
+        t += note.d
+      }
+    }
+    playSequence()
+    this.musicTimer = window.setInterval(playSequence, totalDuration * 1000)
+  }
+
+  private musicNote(freq: number, duration: number) {
+    const ctx = this.ensureContext()
+    const osc = ctx.createOscillator()
+    osc.type = 'triangle'
+    osc.frequency.value = freq
+    const gain = ctx.createGain()
+    gain.gain.setValueAtTime(0, ctx.currentTime)
+    gain.gain.linearRampToValueAtTime(0.14, ctx.currentTime + 0.05)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration)
+    osc.connect(gain)
+    gain.connect(this.musicGain!)
+    osc.start()
+    osc.stop(ctx.currentTime + duration + 0.05)
   }
 
   setMusicVolume(v: number) {
@@ -114,7 +172,11 @@ class SoundManager {
   playPinsFall(count: number) {
     for (let i = 0; i < Math.max(1, count); i++) {
       const delay = i * 40
-      window.setTimeout(() => this.noiseBurst(0.25, { filterFreq: 350 + Math.random() * 200, gain: 0.28 }), delay)
+      window.setTimeout(() => {
+        // Hölzernes "Rums": tiefer Thump-Ton plus knackiges Rauschen für mehr Wucht.
+        this.tone(90 + Math.random() * 40, 0.18, { type: 'sine', gain: 0.22 })
+        this.noiseBurst(0.25, { filterFreq: 350 + Math.random() * 200, gain: 0.32 })
+      }, delay)
     }
   }
 

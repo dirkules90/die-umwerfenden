@@ -10,9 +10,7 @@ export function StartScreen() {
   return (
     <div className="screen">
       <div className="title-logo">🎳 Kegeln in Lembeck</div>
-      <p className="subtitle">
-        Die originalgetreue Outdoor-Kegelbahn aus Lembeck – mit echter Physik und dem legendären Hebel.
-      </p>
+      <p className="subtitle">Die originalgetreue Outdoor-Kegelbahn aus Lembeck.</p>
       <button className="btn" onClick={() => goTo('playerSelect')}>
         Neues Spiel
       </button>

@@ -15,17 +15,14 @@ export function emptyStatistics(): PlayerStatistics {
     perfectThrows: 0,
     gutterThrows: 0,
     longestPerfectStreak: 0,
-    wins: 0,
-    leverPulls: 0,
     achievements: [],
   }
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  musicVolume: 0.5,
-  sfxVolume: 0.8,
+  musicVolume: 0.6,
+  sfxVolume: 0.85,
   hapticsEnabled: true,
-  defaultRounds: 3,
 }
 
 export function loadAllStatistics(): Record<CharacterId, PlayerStatistics> {

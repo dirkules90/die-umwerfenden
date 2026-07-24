@@ -4,18 +4,22 @@ Ein digitales, physikbasiertes Kegelspiel für den mobilen Browser – eine orig
 Nachbildung der Outdoor-Kegelbahn in Lembeck (Dorsten, NRW), inklusive des charakteristischen
 mechanischen Hebels zum Aufstellen der Kegel.
 
-Umgesetzt nach dem Lastenheft „Kegeln in Lembeck" (Version 1.0) für den Freundeskreis Daniel,
-Tobias, Dirk, Fabian, Pascal und Alex.
+Ursprünglich nach dem Lastenheft „Kegeln in Lembeck" (Version 1.0) umgesetzt, seither nach
+Praxistests des Auftraggebers mehrfach angepasst (siehe „Umsetzungsstand" unten) – für den
+Freundeskreis Daniel, Tobias, Dirk, Fabian, Pascal und Alex.
 
 ## Spielprinzip
 
-- **3D-Physik** (Three.js + Rapier.js): Wurf per Drag-and-Shoot, echte Kollisionssimulation von
-  Kugel und neun Kegeln im Kranz-Aufbau.
+- **3D-Physik** (Three.js + Rapier.js): Wurf per Drag-and-Shoot mit drei unabhängigen
+  Komponenten – Richtung, Kraft und Spin/Effet (aus dem Schwung der Fingergeste beim Loslassen) –
+  echte Kollisionssimulation von Kugel und neun Kegeln im Kranz-Aufbau.
 - **Mechanischer Hebel**: Nach jedem Wurf müssen die Kegel per Zuggeste manuell aufgestellt
   werden – das zentrale Alleinstellungsmerkmal der Lembecker Bahn.
-- **Hausnummer-Regelwerk**: Drei Würfe pro Runde, freie Verteilung der Ziffern auf Hunderter-,
-  Zehner- und Einerstelle. Zwei Modi: „Hohe Hausnummer" und „Niedrige Hausnummer".
-- **Sechs Charaktere**, Hotseat-Mehrspielermodus (1–6 Spieler an einem Gerät).
+- **Hausnummer-Regelwerk**: Jede Partie besteht aus genau drei Würfen. Nach jedem Wurf wird frei
+  entschieden, ob die geworfene Ziffer an die Hunderter-, Zehner- oder Einerstelle kommt. Zwei
+  Modi: „Hohe Hausnummer" und „Niedrige Hausnummer" (Rinne zählt als 0 bzw. 9).
+- **Ein Spieler pro Gerät**: Jeder aus der Gruppe wählt beim Spielstart seinen eigenen Charakter
+  und spielt seine eigene Hausnummer auf seinem eigenen Handy – kein Hotseat-Wechsel.
 - **Lokale Statistik & Achievements**, ausschließlich im Browser gespeichert (LocalStorage),
   kein Server, kein Login.
 - **PWA**: installierbar, offline-fähig nach dem ersten Laden.
@@ -45,48 +49,49 @@ einem Fork oder einer Umbenennung des Repositories muss dieser Pfad angepasst we
 
 ## Projektstruktur
 
-Die Struktur folgt Teil 18 des Lastenhefts:
-
 ```
 src/
 ├── scene/         3D-Aufbau (Bahn, Kugel, Kegel, Hebel, Kamera, Umgebung)
 ├── physics/        Rapier-Weltinitialisierung, Kollisions-/Rinnenlogik
 ├── characters/     Sechs Charakterdefinitionen, stilisierte Low-Poly-Avatare
-├── game/           Zustandsautomat, Hausnummer-Regeln, Scoring, Achievements
+├── game/           Zustandsautomat, Hausnummer-Regeln, Achievements
 ├── state/          Zentraler Zustand (Zustand-Store)
 ├── ui/             Bildschirme, HUD, Eingabe-Hooks (Drag-and-Shoot, Hebel)
 ├── audio/           Web-Audio-Soundmanager
 └── storage/         LocalStorage-Persistenz
 ```
 
-## Umsetzungsstand gegenüber dem Lastenheft
+## Umsetzungsstand
 
-Der komplette Kernspielablauf aus Teil 3.3 ist funktionsfähig implementiert und wurde
-End-to-End getestet (Wurf → Physik → Rinnen-/Kegelauswertung → Ziffernwahl → Hebel →
-Kegel-Aufrichtung → Kugelrücklauf → Spielerwechsel → Rundenergebnis → Bestenliste).
-Alle Teile 1–20 sind umgesetzt; ein paar Punkte im Detail:
+Das Projekt startete als Umsetzung des Lastenhefts „Kegeln in Lembeck" v1.0 (Hotseat-Mehrspieler,
+mehrere Runden, Kugelauswahl leicht/schwer). Nach Praxistests des Auftraggebers wurde das Konzept
+mehrfach angepasst:
 
-- **Avatare** (Teil 11.2) sind eigenständige, stilisierte Low-Poly-Figuren, unterschieden durch
-  Statur, Haarfarbe, Bart und Brille. Es wurden keine Referenzfotos realer Personen verarbeitet;
-  die Charaktere sind bewusst abstrahiert statt fotorealistisch nachgebildet.
-- **Sounddesign** (Teil 13): Die Architektur (Web Audio API, getrennte Musik-/Effektlautstärke,
-  Ereignis- und Ambient-Sounds) ist vollständig umgesetzt. Da keine lizenzierten Audioaufnahmen
-  vorliegen, werden alle Klänge prozedural synthetisiert (Oszillatoren/Rauschgeneratoren) statt
-  aus produzierten Audiodateien zu stammen. Produzierte Sounds lassen sich später 1:1 in
-  `src/audio/soundManager.ts` einsetzen, ohne die Aufrufstellen zu ändern.
-- **Umgebung** (Teil 4): Bahn, Rinnen, Kegelstand, Vereinsheim, Bäume und Bänke sind als
-  stilisierte Cartoon-Geometrie umgesetzt, nicht als detailgetreue Nachbildung der
-  Referenzfotos (die diesem Lastenheft nicht als Bilddateien beilagen). Die im Lastenheft
-  vorgesehenen Werbebanner am Bahnrand wurden auf Wunsch des Auftraggebers entfernt, da sie
-  im Spiel die Sicht auf die Bahn versperrten.
-- **Spielerfotos**: Statt generierter 3D-Kopf-Renderings verwendet die Charakterauswahl
-  echte, vom Auftraggeber bereitgestellte Fotos (`public/icons/<Name>.png`).
-- **Erweiterungen aus Teil 21** (Tag-/Nachtmodus, Wetter, Online-Highscores, weitere
-  Kameraperspektive, König-Kegel-Sonderregel etc.) sind wie im Lastenheft festgelegt **nicht**
-  Teil dieses ersten Entwicklungsumfangs.
-- **Kugelauswahl** (Teil 4.5): Auf Wunsch des Auftraggebers nach dem ersten Praxistest wurde die
-  Wahl zwischen leichter und schwerer Kugel entfernt, um das Spiel weniger verwirrend zu machen.
-  Es gibt jetzt nur noch eine einzige Kugel mit fest eingestellten Wurfeigenschaften.
+- **Ein Spieler pro Partie/Gerät** statt Hotseat: Jeder aus der Gruppe spielt auf dem eigenen
+  Handy und ermittelt seinen eigenen Highscore. Spielerauswahl ist daher eine Einzelauswahl statt
+  Mehrfachauswahl.
+- **Immer eine Runde** (drei Würfe) statt konfigurierbarer Rundenanzahl.
+- **Eine Kugel** statt der ursprünglich vorgesehenen Auswahl zwischen leicht/schwer.
+- **Spin/Effet als dritte Steuerungskomponente**: Neben Richtung und Kraft lässt sich die Kugel
+  durch einen seitlichen Schwung am Ende der Zuggeste anschneiden, was die Flugbahn per
+  vereinfachtem Magnus-Effekt krümmt.
+- **Avatare** sind eigenständige, stilisierte Low-Poly-Figuren für die Wurfanimation im 3D-Spiel;
+  in Auswahlbildschirm und HUD werden zusätzlich echte, vom Auftraggeber bereitgestellte Fotos
+  angezeigt (`public/icons/<Name>.png`).
+- **Sounddesign**: Die Architektur (Web Audio API, getrennte Musik-/Effektlautstärke,
+  Ereignis-Sounds, Hintergrundmusik) ist vollständig umgesetzt. Da keine lizenzierten
+  Audioaufnahmen vorliegen, werden alle Klänge und die Hintergrundmelodie prozedural
+  synthetisiert (Oszillatoren/Rauschgeneratoren) statt aus produzierten Audiodateien zu stammen.
+  Produzierte Sounds lassen sich später 1:1 in `src/audio/soundManager.ts` einsetzen, ohne die
+  Aufrufstellen zu ändern.
+- **Umgebung**: Bahn, Rinnen, Kegelstand, Vereinsheim (mit „Die Umwerfenden"-Schriftzug an der
+  Fassade), Bäume und Bänke sind als stilisierte Cartoon-Geometrie umgesetzt, nicht als
+  detailgetreue Nachbildung realer Referenzfotos. Die ursprünglich vorgesehenen Werbebanner am
+  Bahnrand wurden entfernt, da sie im Spiel die Sicht auf die Bahn versperrten.
+- **Statistik**: Zeigt Bestwerte (Hoch/Niedrig), Partienzahl, „Alle Neune"-Treffer, Rinnenwürfe
+  und Achievements. Da nur noch solo gespielt wird, entfallen Siegquote und Hebel-Betätigungen.
+- Tag-/Nachtmodus, Wetterzustände, Online-Highscores, weitere Kameraperspektive und die
+  König-Kegel-Sonderregel aus dem ursprünglichen Lastenheft sind weiterhin **nicht** umgesetzt.
 
 ## Lizenz / Datenschutz
 

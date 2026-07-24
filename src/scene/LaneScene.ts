@@ -147,6 +147,9 @@ export class LaneScene {
     if (this.character) this.scene.remove(this.character.group)
     this.character = new CharacterModel(config)
     this.character.group.position.copy(CHARACTER_STAND)
+    // Modell blickt lokal in +Z; die Kamera steht hinter dem Spieler und schaut Richtung
+    // Kegelstand (-Z), daher um 180° drehen, damit der Spieler zur Bahn blickt statt zur Kamera.
+    this.character.group.rotation.y = Math.PI
     this.scene.add(this.character.group)
   }
 
@@ -207,6 +210,10 @@ export class LaneScene {
 
   runLeverSequence(onGearDone: () => void, onBallReturnDone: () => void) {
     this.lever.setGlow(false)
+    // Kugel während der gesamten Aufricht-/Rücklaufsequenz zum Sensor machen: sie darf frisch
+    // aufgestellte Kegel nicht anrempeln, egal wo sie zufällig zum Stehen gekommen ist (Bug:
+    // "nicht alle Kegel stellen sich wieder auf").
+    this.ball.setSensor(true)
     let gearT = 0
     const gearDuration = 1.2
     const gearTick = () => {
@@ -230,6 +237,10 @@ export class LaneScene {
   }
 
   private uprightPins(onDone: () => void) {
+    // Alle Kegel bleiben kinematisch, bis WIRKLICH jeder seine Zielposition erreicht hat, und
+    // werden erst dann gemeinsam auf Dynamic zurückgeschaltet. Andernfalls könnte ein noch
+    // fahrender (kinematischer) Kegel einen bereits fertigen, schon dynamischen Nachbarn anstoßen
+    // und wieder umwerfen (Bug: "nicht alle Kegel stellen sich wieder auf").
     let remaining = this.pins.length
     this.pins.forEach((pin, i) => {
       const startPos = pin.body.translation()
@@ -251,11 +262,15 @@ export class LaneScene {
             pin.body.setNextKinematicRotation(rot)
           },
           () => {
-            pin.body.setBodyType(this.rapier.RigidBodyType.Dynamic, true)
-            pin.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
-            pin.body.setAngvel({ x: 0, y: 0, z: 0 }, true)
             remaining -= 1
-            if (remaining <= 0) onDone()
+            if (remaining <= 0) {
+              for (const p of this.pins) {
+                p.body.setBodyType(this.rapier.RigidBodyType.Dynamic, true)
+                p.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
+                p.body.setAngvel({ x: 0, y: 0, z: 0 }, true)
+              }
+              onDone()
+            }
           },
         )
       }, i * 60)
@@ -276,6 +291,7 @@ export class LaneScene {
       () => {
         this.ball.body.setBodyType(this.rapier.RigidBodyType.Dynamic, true)
         this.ball.reset()
+        this.ball.setSensor(false)
         this.character?.resetPose()
         this.cameraRig.tweenTo(PRE_THROW_POS, PRE_THROW_LOOK, 0.6)
         this.throwPhase = 'idle'
@@ -333,6 +349,7 @@ export class LaneScene {
 
     this.accumulator += dt
     while (this.accumulator >= FIXED_TIMESTEP) {
+      if (this.throwPhase === 'rolling') this.ball.applyCurve(FIXED_TIMESTEP)
       this.world.step()
       this.accumulator -= FIXED_TIMESTEP
     }

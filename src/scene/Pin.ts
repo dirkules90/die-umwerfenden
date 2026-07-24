@@ -4,6 +4,27 @@ import { PIN_HEIGHT, PIN_RADIUS } from '../physics/laneConstants'
 
 const RING_COLORS = [0xc0392b, 0x2e7d32]
 
+/** Silhouette eines klassischen Kegels (Sockel, bauchiger Korpus, Hals, rundlicher Kopf),
+ * erzeugt per Rotationskörper. Punkte laufen von der Fußfläche (-H/2) bis zur Kopfspitze (+H/2),
+ * relativ zum Körperzentrum, damit sie exakt mit dem zentrierten Physik-Collider übereinstimmen. */
+function buildPinProfile(): THREE.Vector2[] {
+  const h = PIN_HEIGHT
+  const r = PIN_RADIUS
+  return [
+    new THREE.Vector2(0, -h / 2),
+    new THREE.Vector2(r * 0.82, -h / 2),
+    new THREE.Vector2(r * 0.92, -h / 2 + 0.06 * h),
+    new THREE.Vector2(r * 1.0, -h / 2 + 0.28 * h),
+    new THREE.Vector2(r * 0.88, -h / 2 + 0.46 * h),
+    new THREE.Vector2(r * 0.5, -h / 2 + 0.6 * h),
+    new THREE.Vector2(r * 0.58, -h / 2 + 0.66 * h),
+    new THREE.Vector2(r * 0.42, -h / 2 + 0.72 * h),
+    new THREE.Vector2(r * 0.56, -h / 2 + 0.88 * h),
+    new THREE.Vector2(r * 0.18, h / 2),
+    new THREE.Vector2(0, h / 2),
+  ]
+}
+
 export class Pin {
   mesh: THREE.Group
   body: RAPIER.RigidBody
@@ -15,18 +36,17 @@ export class Pin {
     this.startPosition = position.clone()
 
     const group = new THREE.Group()
-    const bodyGeo = new THREE.CylinderGeometry(PIN_RADIUS * 0.55, PIN_RADIUS, PIN_HEIGHT, 12)
+    const bodyGeo = new THREE.LatheGeometry(buildPinProfile(), 16)
     const bodyMat = new THREE.MeshStandardMaterial({ color: 0xe8d4a8, roughness: 0.6 })
     const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat)
-    bodyMesh.position.y = PIN_HEIGHT / 2
     bodyMesh.castShadow = true
 
     const ringColor = index === 8 ? 0xf1c40f : RING_COLORS[index % 2]
     const ring = new THREE.Mesh(
-      new THREE.CylinderGeometry(PIN_RADIUS * 0.58, PIN_RADIUS * 0.58, PIN_HEIGHT * 0.18, 12),
+      new THREE.CylinderGeometry(PIN_RADIUS * 0.62, PIN_RADIUS * 0.62, PIN_HEIGHT * 0.1, 12),
       new THREE.MeshStandardMaterial({ color: ringColor, roughness: 0.5 }),
     )
-    ring.position.y = PIN_HEIGHT * 0.78
+    ring.position.y = -PIN_HEIGHT / 2 + 0.66 * PIN_HEIGHT
     group.add(bodyMesh, ring)
     this.mesh = group
 
@@ -43,13 +63,6 @@ export class Pin {
       .setFriction(0.9)
       .setRestitution(0.05)
     world.createCollider(colliderDesc, this.body)
-  }
-
-  resetUpright() {
-    this.body.setTranslation({ x: this.startPosition.x, y: this.startPosition.y, z: this.startPosition.z }, true)
-    this.body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true)
-    this.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
-    this.body.setAngvel({ x: 0, y: 0, z: 0 }, true)
   }
 
   syncMesh() {

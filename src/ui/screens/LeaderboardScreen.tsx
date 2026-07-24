@@ -24,7 +24,6 @@ export function LeaderboardScreen() {
                 <th>Beste Hoch</th>
                 <th>Beste Niedrig</th>
                 <th>Partien</th>
-                <th>Siege</th>
               </tr>
             </thead>
             <tbody>
@@ -34,7 +33,6 @@ export function LeaderboardScreen() {
                   <td>{stats.bestHigh !== null ? String(stats.bestHigh).padStart(3, '0') : '–'}</td>
                   <td>{stats.bestLow !== null ? String(stats.bestLow).padStart(3, '0') : '–'}</td>
                   <td>{stats.gamesPlayed}</td>
-                  <td>{stats.wins}</td>
                 </tr>
               ))}
             </tbody>

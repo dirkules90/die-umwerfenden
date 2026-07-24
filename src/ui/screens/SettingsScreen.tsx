@@ -59,18 +59,6 @@ export function SettingsScreen() {
             onChange={(e) => updateSettings({ hapticsEnabled: e.target.checked })}
           />
         </div>
-        <div className="settings-row">
-          <label htmlFor="rounds">Standard-Rundenanzahl</label>
-          <input
-            id="rounds"
-            type="range"
-            min={1}
-            max={5}
-            value={settings.defaultRounds}
-            onChange={(e) => updateSettings({ defaultRounds: Number(e.target.value) })}
-          />
-          <span>{settings.defaultRounds}</span>
-        </div>
       </div>
 
       <div className="panel" style={{ width: '100%', maxWidth: '28rem' }}>

@@ -262,6 +262,15 @@ button {
 .hud-top-right {
   right: 0.6rem;
   text-align: right;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.hud-digit {
+  font-size: 1.6rem;
+  font-weight: 800;
+  min-width: 1.2ch;
+  text-align: center;
 }
 
 .hud-menu-btn {
