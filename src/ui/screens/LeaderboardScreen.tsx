@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useGameStore } from '../../state/gameStore'
 import { AVATAR_CONFIGS, CHARACTER_ORDER } from '../../characters/avatarConfigs'
-import { computeTotalDailyPoints, dailyWinners } from '../../game/dailyWinner'
+import { computeAchievementBonus, computeTotalDailyPoints, dailyWinners } from '../../game/dailyWinner'
 import { todayKey } from '../../game/dateKey'
 import { ACHIEVEMENT_DEFS, hasAchievement } from '../../game/achievements'
 import { emptyStatistics } from '../../storage/localStorageService'
@@ -15,11 +15,17 @@ export function LeaderboardScreen() {
   const [selected, setSelected] = useState<CharacterId>('daniel')
 
   const todayPoints = computeTotalDailyPoints(dailyRecords, statistics, todayKey())
+  const achievementBonus = computeAchievementBonus(statistics, todayKey())
   const { ids: winnerIds, points: winnerPoints } = dailyWinners(todayPoints)
 
-  const rows = CHARACTER_ORDER.map((id) => ({ id, stats: statistics[id], points: todayPoints[id] ?? 0 }))
-    .filter((r): r is { id: CharacterId; stats: NonNullable<(typeof r)['stats']>; points: number } => !!r.stats)
-    .sort((a, b) => b.points - a.points)
+  // Alle sechs Spieler von Anfang an fest anzeigen (mit "-" bzw. 0 Punkten), statt die Liste
+  // erst wachsen zu lassen, sobald jemand sein erstes Spiel überhaupt gespielt hat - so bleibt
+  // die Zeilenzahl konstant und die Liste "springt" nicht.
+  const rows = CHARACTER_ORDER.map((id) => ({
+    id,
+    stats: statistics[id] ?? emptyStatistics(),
+    points: todayPoints[id] ?? 0,
+  })).sort((a, b) => b.points - a.points)
 
   const detailStats = statistics[selected] ?? emptyStatistics()
   const avgHigh = detailStats.countHigh > 0 ? (detailStats.totalScoreHigh / detailStats.countHigh).toFixed(1) : '–'
@@ -51,40 +57,44 @@ export function LeaderboardScreen() {
       </div>
 
       <div className="panel" style={{ maxWidth: '46rem', width: '100%', overflowX: 'auto' }}>
-        {rows.length === 0 ? (
-          <p>Noch keine Partien gespielt.</p>
-        ) : (
-          <table className="leaderboard-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Spieler</th>
-                <th>Punkte heute</th>
-                <th>Beste Hoch</th>
-                <th>Beste Niedrig</th>
-                <th>Tannenbaum</th>
-                <th>Partien</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(({ id, stats, points }, i) => (
+        <table className="leaderboard-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Spieler</th>
+              <th>Punkte heute</th>
+              <th>Beste Hoch</th>
+              <th>Beste Niedrig</th>
+              <th>Tannenbaum</th>
+              <th>Partien</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ id, stats, points }, i) => {
+              const bonus = achievementBonus[id] ?? 0
+              return (
                 <tr key={id}>
                   <td>{i + 1}</td>
                   <td>{AVATAR_CONFIGS[id].name}</td>
-                  <td>{points > 0 ? formatPoints(points) : '–'}</td>
+                  <td>
+                    {points > 0 ? formatPoints(points) : '–'}
+                    {bonus > 0 && (
+                      <span style={{ opacity: 0.7, fontSize: '0.75em' }}> (davon 🏆{formatPoints(bonus)})</span>
+                    )}
+                  </td>
                   <td>{stats.bestHigh !== null ? String(stats.bestHigh).padStart(3, '0') : '–'}</td>
                   <td>{stats.bestLow !== null ? String(stats.bestLow).padStart(3, '0') : '–'}</td>
                   <td>{stats.bestTannenbaum !== null ? `${stats.bestTannenbaum} Würfe` : '–'}</td>
                   <td>{stats.gamesPlayed}</td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              )
+            })}
+          </tbody>
+        </table>
       </div>
       <p style={{ maxWidth: '46rem', fontSize: '0.68rem', opacity: 0.65, margin: 0 }}>
         Punkte heute: Hausnummer Platz 1-3 = 3/2/1, Tannenbaum Platz 1-3 = 6/4/2, meiste Partien heute = 1, dazu
-        Achievement-Boni (siehe unten) - bei Gleichstand aufgeteilt.
+        Achievement-Boni (🏆, siehe unten) - bei Gleichstand aufgeteilt.
       </p>
 
       <button className="btn secondary" onClick={() => goTo('allTime')}>
