@@ -104,6 +104,12 @@ button {
   letter-spacing: -0.5px;
 }
 
+.title-logo-img {
+  height: clamp(4rem, 14vh, 7rem);
+  width: auto;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.35));
+}
+
 .subtitle {
   font-size: 1rem;
   opacity: 0.85;

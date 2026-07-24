@@ -11,8 +11,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icons/favicon-32.png', 'icons/apple-touch-icon.png'],
       manifest: {
-        name: 'Kegeln in Lembeck',
-        short_name: 'Lembeck Kegeln',
+        name: 'Die Umwerfenden',
+        short_name: 'Umwerfenden',
         description:
           'Digitales, physikbasiertes Kegelspiel – originalgetreue Nachbildung der Outdoor-Kegelbahn Lembeck',
         theme_color: '#2E5B3E',

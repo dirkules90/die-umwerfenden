@@ -52,7 +52,7 @@ export default function App() {
       <div className="orientation-warning">
         <div className="rotate-icon">📱</div>
         <h2>Bitte Gerät drehen</h2>
-        <p>Kegeln in Lembeck wird ausschließlich im Querformat gespielt.</p>
+        <p>Die Umwerfenden wird ausschließlich im Querformat gespielt.</p>
       </div>
     </>
   )

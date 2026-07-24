@@ -1,12 +1,12 @@
-# 🎳 Kegeln in Lembeck
+# 🎳 Die Umwerfenden
 
 Ein digitales, physikbasiertes Kegelspiel für den mobilen Browser – eine originalgetreue
 Nachbildung der Outdoor-Kegelbahn in Lembeck (Dorsten, NRW), inklusive des charakteristischen
 mechanischen Hebels zum Aufstellen der Kegel.
 
 Ursprünglich nach dem Lastenheft „Kegeln in Lembeck" (Version 1.0) umgesetzt, seither nach
-Praxistests des Auftraggebers mehrfach angepasst (siehe „Umsetzungsstand" unten) – für den
-Freundeskreis Daniel, Tobias, Dirk, Fabian, Pascal und Alex.
+Praxistests des Auftraggebers mehrfach angepasst (siehe „Umsetzungsstand" unten) und in „Die
+Umwerfenden" umbenannt – für den Freundeskreis Daniel, Tobias, Dirk, Fabian, Pascal und Alex.
 
 ## Spielprinzip
 
