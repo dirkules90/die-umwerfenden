@@ -7,6 +7,7 @@ import { DIGIT_SLOTS, freeSlots } from '../../game/houseNumberRules'
 import { groupHighscore } from '../../game/highscore'
 import { useDragShoot } from '../hooks/useDragShoot'
 import { useLeverDrag } from '../hooks/useLeverDrag'
+import { useSteerDrag } from '../hooks/useSteerDrag'
 import { AchievementBanner } from '../components/AchievementBanner'
 import { ConfettiOverlay } from '../components/ConfettiOverlay'
 import { ControlsHelp } from '../components/ControlsHelp'
@@ -108,6 +109,11 @@ export function GameScreen() {
     },
   })
 
+  const steerDrag = useSteerDrag({
+    disabled: !inFlight,
+    onSteer: (direction) => sceneRef.current?.setSteerInput(direction),
+  })
+
   const leverDrag = useLeverDrag({
     onProgress: (p) => {
       setLeverProgress(p)
@@ -192,6 +198,16 @@ export function GameScreen() {
               <div className="power-meter-fill" style={{ height: `${dragShoot.aim.pullFraction * 100}%` }} />
             </div>
           </>
+        )}
+
+        {session.phase === 'idle' && inFlight && (
+          <div
+            className="steer-touch-zone"
+            onPointerDown={steerDrag.onPointerDown}
+            onPointerMove={steerDrag.onPointerMove}
+            onPointerUp={steerDrag.onPointerUp}
+            onPointerLeave={steerDrag.onPointerUp}
+          />
         )}
 
         {session.phase === 'digitChoice' && session.pendingDigit !== null && (

@@ -232,6 +232,13 @@ export class LaneScene {
     this.cameraRig.tweenTo(leverPos, leverLook, 0.7)
   }
 
+  /** Nachkorrektur während die Kugel rollt (siehe Ball.applySteer): außerhalb der Roll-Phase
+   * wirkungslos, damit ein spät ankommender Zeigerwechsel (z.B. beim Loslassen) nichts mehr tut. */
+  setSteerInput(direction: number) {
+    if (this.throwPhase !== 'rolling') return
+    this.ball.setSteerInput(direction)
+  }
+
   setLeverProgress(progress: number) {
     this.lever.setPullProgress(progress)
   }
@@ -403,7 +410,10 @@ export class LaneScene {
 
     this.accumulator += dt
     while (this.accumulator >= FIXED_TIMESTEP) {
-      if (this.throwPhase === 'rolling') this.ball.applyCurve(FIXED_TIMESTEP)
+      if (this.throwPhase === 'rolling') {
+        this.ball.applyCurve(FIXED_TIMESTEP)
+        this.ball.applySteer(FIXED_TIMESTEP)
+      }
       this.world.step()
       this.accumulator -= FIXED_TIMESTEP
     }

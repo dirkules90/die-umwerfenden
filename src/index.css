@@ -322,9 +322,14 @@ button {
   background: linear-gradient(0deg, #3cb043, #f4d03f, #c0392b);
 }
 
-.throw-touch-zone {
+.throw-touch-zone,
+.steer-touch-zone {
   position: absolute;
   inset: 0;
+}
+
+.steer-touch-zone {
+  touch-action: none;
 }
 
 .digit-choice-overlay,

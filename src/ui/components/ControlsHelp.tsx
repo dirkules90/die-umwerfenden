@@ -28,6 +28,11 @@ export function ControlsHelp({ className = 'btn secondary' }: { className?: stri
               <strong>🌀 Spin</strong> – ein schneller seitlicher Schwung genau im Moment des Loslassens lässt die
               Kugel im Bogen kurven, statt geradeaus zu rollen.
             </p>
+            <p>
+              <strong>👉 Nachkorrektur</strong> – während die Kugel rollt, kannst du kurz nach links oder rechts
+              wischen, um sie noch etwas zu lenken. Das Budget dafür ist klein und lässt mit dem Ausrollen der
+              Kugel nach – ein schlechter Wurf lässt sich damit nur fein korrigieren, nicht retten.
+            </p>
             <button className="btn secondary" onClick={() => setOpen(false)}>
               Verstanden
             </button>

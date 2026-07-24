@@ -4,6 +4,7 @@ import { LaneScene } from '../../scene/LaneScene'
 import { AVATAR_CONFIGS } from '../../characters/avatarConfigs'
 import { useDragShoot } from '../hooks/useDragShoot'
 import { useLeverDrag } from '../hooks/useLeverDrag'
+import { useSteerDrag } from '../hooks/useSteerDrag'
 import { ConfettiOverlay } from '../components/ConfettiOverlay'
 import { ControlsHelp } from '../components/ControlsHelp'
 import { FullscreenButton } from '../components/FullscreenButton'
@@ -99,6 +100,11 @@ export function TannenbaumScreen() {
     },
   })
 
+  const steerDrag = useSteerDrag({
+    disabled: !inFlight,
+    onSteer: (direction) => sceneRef.current?.setSteerInput(direction),
+  })
+
   const leverDrag = useLeverDrag({
     onProgress: (p) => {
       setLeverProgress(p)
@@ -162,6 +168,16 @@ export function TannenbaumScreen() {
               <div className="power-meter-fill" style={{ height: `${dragShoot.aim.pullFraction * 100}%` }} />
             </div>
           </>
+        )}
+
+        {session.phase === 'idle' && inFlight && (
+          <div
+            className="steer-touch-zone"
+            onPointerDown={steerDrag.onPointerDown}
+            onPointerMove={steerDrag.onPointerMove}
+            onPointerUp={steerDrag.onPointerUp}
+            onPointerLeave={steerDrag.onPointerUp}
+          />
         )}
 
         {session.phase === 'leverWaiting' && (
