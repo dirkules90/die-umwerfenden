@@ -4,6 +4,7 @@ import { ensureRapierInitialized, createWorld, FIXED_TIMESTEP } from '../physics
 import { isInGutter, isPinFallen } from '../physics/collisions'
 import {
   BALL_RADIUS,
+  GUTTER_HALF_OUTER,
   LANE_HALF_WIDTH,
   PIN_HEIGHT,
   PIN_LAYOUT,
@@ -90,6 +91,30 @@ export class LaneScene {
       this.rapier.ColliderDesc.cuboid(6, 0.05, 20).setTranslation(0, -0.05, 0).setFriction(0.5),
       groundBody,
     )
+
+    // Echte Rinnen (Teil 8.2/8.3): Kies-Boden mit spürbar höherer Reibung bremst die Kugel dort
+    // stärker ab, und eine niedrige Außenwand hält sie in der Rinne fest, statt dass sie einfach
+    // Richtung Wiese weiterrollt.
+    const gutterHalfWidth = (GUTTER_HALF_OUTER - LANE_HALF_WIDTH) / 2
+    for (const side of [-1, 1] as const) {
+      const gutterCenterX = side * (LANE_HALF_WIDTH + gutterHalfWidth)
+      const gutterFloorBody = this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed())
+      this.world.createCollider(
+        this.rapier.ColliderDesc.cuboid(gutterHalfWidth, 0.05, 20)
+          .setTranslation(gutterCenterX, -0.049, 0)
+          .setFriction(0.55),
+        gutterFloorBody,
+      )
+
+      const wallBody = this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed())
+      this.world.createCollider(
+        this.rapier.ColliderDesc.cuboid(0.04, 0.16, 20)
+          .setTranslation(side * GUTTER_HALF_OUTER, 0.14, 0)
+          .setFriction(0.3)
+          .setRestitution(0.1),
+        wallBody,
+      )
+    }
 
     // Rückwand am Kegelstand (deckt sich mit der sichtbaren Fangwand in Environment.ts):
     // ohne diese Kollision würde eine sehr kraftvoll geworfene Kugel physikalisch ungebremst
@@ -402,8 +427,11 @@ export class LaneScene {
 
       if (this.settleTimerMs >= SETTLE_DURATION_MS) {
         this.throwPhase = 'settled'
-        const isGutter = isInGutter(ballPos.x)
         const pinsDown = this.countFallenPins()
+        // Eine Kugel, die nach dem Anstoßen von Kegeln seitlich in die Rinne weiterrollt, ist
+        // kein Fehlwurf mehr - sie hat die Kegel ja bereits getroffen. Nur wenn wirklich kein
+        // einziger Kegel gefallen ist, zählt die Endposition in der Rinne als "Rinne".
+        const isGutter = isInGutter(ballPos.x) && pinsDown === 0
         const wasAllNine = pinsDown === 9 && !isGutter
         const resultLook = new THREE.Vector3(0, 0.3, PIN_STAND_Z)
         const resultPos = new THREE.Vector3(0.8, 1.3, PIN_STAND_Z + 2.2)

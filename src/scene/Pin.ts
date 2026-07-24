@@ -57,7 +57,11 @@ export class Pin {
       .setCcdEnabled(true)
     this.body = world.createRigidBody(bodyDesc)
 
-    const mass = 0.3
+    // Bewusst etwas schwerer als eine reine Bowlingkugel-Proportion nahelegen würde: ein reiner
+    // Kraftwurf mittig durch den Kranz soll nicht zuverlässig alle neun umwerfen - dafür braucht
+    // es eine gut getroffene Kombination aus Tempo und Spin, die den Aufprall über die Reihen
+    // verteilt (Teil 8.4/8.5, "Standfestigkeit").
+    const mass = 0.42
     const colliderDesc = rapier.ColliderDesc.cylinder(PIN_HEIGHT / 2, PIN_RADIUS)
       .setDensity(mass / (Math.PI * PIN_RADIUS ** 2 * PIN_HEIGHT))
       .setFriction(0.9)

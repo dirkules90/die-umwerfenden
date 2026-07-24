@@ -118,6 +118,14 @@ export class Environment {
       )
       rail.position.set(side * LANE_HALF_WIDTH, 0.05, LANE_CENTER_Z)
       this.group.add(rail)
+
+      // Äußere Rinnenkante: hält die Kugel sichtbar in der Rinne (siehe passende Physik-Wand
+      // in LaneScene.ts), statt dass sie einfach Richtung Wiese weiterrollt.
+      const curb = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.15, LANE_LENGTH), toonMat(COLORS.gravel, 0.8))
+      curb.position.set(side * GUTTER_HALF_OUTER, 0.05, LANE_CENTER_Z)
+      curb.castShadow = true
+      curb.receiveShadow = true
+      this.group.add(curb)
     }
   }
 

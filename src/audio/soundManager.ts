@@ -10,25 +10,37 @@
 
 type NoiseKind = 'white' | 'pink'
 
-// Sommerlich-folkloristische Dauerschleife (Teil 13.4), pentatonisch, damit sie sich trotz
-// Zufälligkeit-freier Synthese nicht dissonant/computerhaft anhört. Freq. in Hz, Dauer in Sekunden.
+// Fröhliche 8-Bit-Dauerschleife im Stil klassischer Handheld-Rollenspiel-Ortsmusik (Teil 13.4):
+// hüpfende Dur-Melodie auf einer Square-Wave (Kanal 1) über einer ruhigen Bass-Stimme (Kanal 2).
+// Freq. in Hz, Dauer in Sekunden; f: 0 = Pause.
 const MUSIC_MELODY: { f: number; d: number }[] = [
-  { f: 392, d: 0.5 },
-  { f: 440, d: 0.5 },
-  { f: 494, d: 0.5 },
-  { f: 587, d: 0.75 },
-  { f: 494, d: 0.5 },
-  { f: 440, d: 0.5 },
-  { f: 392, d: 1.0 },
-  { f: 0, d: 0.5 },
-  { f: 440, d: 0.5 },
-  { f: 494, d: 0.5 },
-  { f: 587, d: 0.5 },
-  { f: 659, d: 0.75 },
-  { f: 587, d: 0.5 },
-  { f: 494, d: 0.5 },
-  { f: 440, d: 1.0 },
-  { f: 0, d: 0.75 },
+  { f: 784, d: 0.22 },
+  { f: 659, d: 0.22 },
+  { f: 784, d: 0.22 },
+  { f: 1047, d: 0.22 },
+  { f: 988, d: 0.22 },
+  { f: 784, d: 0.22 },
+  { f: 659, d: 0.22 },
+  { f: 587, d: 0.22 },
+  { f: 1047, d: 0.22 },
+  { f: 988, d: 0.22 },
+  { f: 784, d: 0.22 },
+  { f: 659, d: 0.22 },
+  { f: 784, d: 0.22 },
+  { f: 880, d: 0.22 },
+  { f: 784, d: 0.22 },
+  { f: 0, d: 0.22 },
+]
+
+const MUSIC_BASS: { f: number; d: number }[] = [
+  { f: 131, d: 0.44 },
+  { f: 131, d: 0.44 },
+  { f: 196, d: 0.44 },
+  { f: 196, d: 0.44 },
+  { f: 220, d: 0.44 },
+  { f: 220, d: 0.44 },
+  { f: 175, d: 0.44 },
+  { f: 175, d: 0.44 },
 ]
 
 class SoundManager {
@@ -68,24 +80,32 @@ class SoundManager {
         if (note.f > 0) {
           window.setTimeout(() => {
             if (this.musicTimer === null) return
-            this.musicNote(note.f, note.d * 0.9)
+            this.musicNote(note.f, note.d * 0.85, 'square', 0.09)
           }, t * 1000)
         }
         t += note.d
+      }
+      let bt = 0
+      for (const note of MUSIC_BASS) {
+        window.setTimeout(() => {
+          if (this.musicTimer === null) return
+          this.musicNote(note.f, note.d * 0.9, 'triangle', 0.12)
+        }, bt * 1000)
+        bt += note.d
       }
     }
     playSequence()
     this.musicTimer = window.setInterval(playSequence, totalDuration * 1000)
   }
 
-  private musicNote(freq: number, duration: number) {
+  private musicNote(freq: number, duration: number, type: OscillatorType, gainLevel: number) {
     const ctx = this.ensureContext()
     const osc = ctx.createOscillator()
-    osc.type = 'triangle'
+    osc.type = type
     osc.frequency.value = freq
     const gain = ctx.createGain()
     gain.gain.setValueAtTime(0, ctx.currentTime)
-    gain.gain.linearRampToValueAtTime(0.14, ctx.currentTime + 0.05)
+    gain.gain.linearRampToValueAtTime(gainLevel, ctx.currentTime + 0.03)
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration)
     osc.connect(gain)
     gain.connect(this.musicGain!)

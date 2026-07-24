@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useGameStore } from '../../state/gameStore'
+import { ControlsHelp } from '../components/ControlsHelp'
 import type { GameMode } from '../../game/types'
 
 export function ModeSelectScreen() {
@@ -28,9 +29,12 @@ export function ModeSelectScreen() {
         </button>
       </div>
 
-      <button className="btn" onClick={() => startGame(mode)}>
-        Spiel starten
-      </button>
+      <div style={{ display: 'flex', gap: '0.8rem' }}>
+        <button className="btn" onClick={() => startGame(mode)}>
+          Spiel starten
+        </button>
+        <ControlsHelp />
+      </div>
     </div>
   )
 }

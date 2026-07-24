@@ -4,10 +4,12 @@ import { LaneScene } from '../../scene/LaneScene'
 import { AVATAR_CONFIGS } from '../../characters/avatarConfigs'
 import { currentPlayer } from '../../game/gameStateMachine'
 import { DIGIT_SLOTS, freeSlots } from '../../game/houseNumberRules'
+import { groupHighscore } from '../../game/highscore'
 import { useDragShoot } from '../hooks/useDragShoot'
 import { useLeverDrag } from '../hooks/useLeverDrag'
 import { AchievementBanner } from '../components/AchievementBanner'
 import { ConfettiOverlay } from '../components/ConfettiOverlay'
+import { ControlsHelp } from '../components/ControlsHelp'
 import { FullscreenButton } from '../components/FullscreenButton'
 import type { DigitSlot } from '../../game/types'
 
@@ -139,6 +141,7 @@ export function GameScreen() {
   const openSlots = freeSlots(session.currentDigits)
   const playerStats = statistics[player]
   const personalBest = session.mode === 'hoch' ? playerStats?.bestHigh : playerStats?.bestLow
+  const groupBest = groupHighscore(statistics, session.mode)
 
   return (
     <div className="game-root" ref={containerRef}>
@@ -169,6 +172,11 @@ export function GameScreen() {
           <div className="hud-ranking-row">
             <span>{playerConfig.name}</span>
             <span>{personalBest !== null && personalBest !== undefined ? String(personalBest).padStart(3, '0') : '–'}</span>
+          </div>
+          <div style={{ opacity: 0.8, fontSize: '0.75rem', marginTop: '0.3rem' }}>Highscore</div>
+          <div className="hud-ranking-row">
+            <span>{groupBest?.playerName ?? '–'}</span>
+            <span>{groupBest ? String(groupBest.value).padStart(3, '0') : '–'}</span>
           </div>
         </div>
 
@@ -256,6 +264,7 @@ export function GameScreen() {
               <button className="btn secondary" onClick={() => openSettings('game')}>
                 Einstellungen
               </button>
+              <ControlsHelp />
               <FullscreenButton />
               <button
                 className="btn warn"
