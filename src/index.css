@@ -487,13 +487,24 @@ h3 {
   gap: 0.25rem;
 }
 
+.tannenbaum-top,
 .tannenbaum-crown,
 .tannenbaum-trunk {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.25rem;
+}
+
+.tannenbaum-crown,
+.tannenbaum-trunk {
   padding: 0.5rem 0.7rem;
+}
+
+/* Bewusst ohne eigenen Hintergrund: die Spitze (7 mit Stern) soll sichtbar OBERHALB der grünen
+ * Krone stehen statt darin eingeschlossen zu sein. */
+.tannenbaum-top {
+  padding-bottom: 0.15rem;
 }
 
 .tannenbaum-crown {
