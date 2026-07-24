@@ -240,7 +240,7 @@ button {
 }
 
 .hud-top-left {
-  left: 0.6rem;
+  left: max(0.6rem, env(safe-area-inset-left, 0.6rem));
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -305,7 +305,7 @@ button {
 
 .power-meter-wrap {
   position: absolute;
-  left: 1rem;
+  left: max(1rem, env(safe-area-inset-left, 1rem));
   bottom: 5.2rem;
   width: 14px;
   height: 40vh;
