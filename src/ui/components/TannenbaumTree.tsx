@@ -18,7 +18,10 @@ export function TannenbaumTree({ remaining, compact = false }: TannenbaumTreePro
     return (
       <div className="tannenbaum-row" key={value}>
         {Array.from({ length: count }).map((_, i) => (
-          <span key={i} className={`tannenbaum-cell ${i < checkedCount ? 'checked' : ''}`}>
+          <span
+            key={i}
+            className={`tannenbaum-cell ${i < checkedCount ? 'checked' : ''} ${value === 7 ? 'star' : ''}`}
+          >
             {value}
           </span>
         ))}

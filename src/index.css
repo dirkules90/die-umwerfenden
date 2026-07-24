@@ -62,8 +62,11 @@ button {
 }
 
 .btn.secondary {
-  background: rgba(255, 255, 255, 0.14);
-  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.25);
+  /* Vorher fast durchsichtiges Weiß auf dem hellen Himmel/Wiese-Hintergrund: heller Text auf
+     hellem Grund kaum lesbar. Dunkles Glas wie die Panels sorgt für Kontrast, egal ob der Button
+     auf dem hellen Hintergrund oder einem dunklen Overlay sitzt. */
+  background: rgba(20, 30, 22, 0.55);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
 }
 
 .btn.warn {
@@ -105,10 +108,20 @@ button {
   filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.35));
 }
 
+/* Überschriften und Untertitel stehen oft direkt auf dem hellen Himmel/Wiese-Verlauf statt in
+   einem dunklen Panel - der helle Text (--text-light) allein ist dort kaum lesbar. Ein kräftiger
+   Schatten wirkt wie eine dezente Outline und sorgt auf jedem Hintergrund für Kontrast. */
+h1,
+h2,
+h3 {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55), 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+
 .subtitle {
   font-size: 1rem;
   opacity: 0.85;
   max-width: 32rem;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .orientation-warning {
@@ -513,6 +526,21 @@ button {
   position: relative;
 }
 
+.tannenbaum-cell.star {
+  background: linear-gradient(160deg, #ffe27a, #f2b90f);
+  color: #6b4a06;
+}
+
+.tannenbaum-cell.star::before {
+  content: '⭐';
+  position: absolute;
+  top: -0.85rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
 .tannenbaum-cell.checked {
   background: rgba(255, 255, 255, 0.2);
   color: rgba(255, 255, 255, 0.55);
@@ -532,6 +560,11 @@ button {
   height: 1.3rem;
   font-size: 0.75rem;
   border-radius: 4px;
+}
+
+.tannenbaum-tree.compact .tannenbaum-cell.star::before {
+  top: -0.7rem;
+  font-size: 0.7rem;
 }
 
 .tannenbaum-tree.compact .tannenbaum-row {

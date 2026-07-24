@@ -313,6 +313,7 @@ export class LaneScene {
                 p.body.setBodyType(this.rapier.RigidBodyType.Dynamic, true)
                 p.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
                 p.body.setAngvel({ x: 0, y: 0, z: 0 }, true)
+                p.everFallen = false
               }
               onDone()
             }
@@ -369,11 +370,17 @@ export class LaneScene {
     this.character?.setAnimState('disappointed')
   }
 
+  /** Aktualisiert das Sticky-Flag jedes Kegels an Hand des aktuellen Winkels (siehe Pin.everFallen). */
+  private updateFallenFlags() {
+    for (const pin of this.pins) {
+      if (!pin.everFallen && isPinFallen(pin.body.rotation())) pin.everFallen = true
+    }
+  }
+
   private countFallenPins(): number {
     let count = 0
     for (const pin of this.pins) {
-      const rot = pin.body.rotation()
-      if (isPinFallen(rot)) count++
+      if (pin.everFallen) count++
     }
     return count
   }
@@ -394,6 +401,7 @@ export class LaneScene {
     let dt = rawDt
 
     if (this.throwPhase === 'rolling') {
+      this.updateFallenFlags()
       const fallen = this.countFallenPins()
       if (fallen >= 9 && !this.allNineTriggered) {
         this.allNineTriggered = true

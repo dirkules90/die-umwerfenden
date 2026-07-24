@@ -30,6 +30,12 @@ export class Pin {
   body: RAPIER.RigidBody
   startPosition: THREE.Vector3
   index: number
+  /** Sticky-Flag statt Live-Winkelabfrage bei der Auswertung (siehe LaneScene.tick): ein Kegel,
+   * der beim erzwungenen Settle-Abbruch (forceSettle) gerade mitten im Umkippen ist, würde bei
+   * einer einmaligen Momentaufnahme seines Winkels manchmal knapp unter der Fallen-Schwelle
+   * erwischt und fälschlich als „steht noch” gezählt - bug: „umgefallene Kegel werden manchmal
+   * nicht richtig gezählt”. */
+  everFallen = false
 
   constructor(rapier: typeof RAPIER, world: RAPIER.World, position: THREE.Vector3, index: number) {
     this.index = index

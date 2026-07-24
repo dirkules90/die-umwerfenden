@@ -1,10 +1,12 @@
-/** Zahlenverteilung des Tannenbaums, von unten (Stamm) nach oben (Spitze): Teil 10.5. */
+/** Zahlenverteilung des Tannenbaums, von unten (Stamm) nach oben (Spitze): Teil 10.5.
+ * Bewusst getrimmt (9 statt vorher 15 Zahlen) - eine ganze Partie dauerte im Vergleich zu
+ * Hausnummer/Tannenbaum deutlich zu lange, bis alle Werte abgehakt waren. */
 export const TANNENBAUM_ROWS: { value: number; count: number; trunk: boolean }[] = [
-  { value: 2, count: 2, trunk: true },
-  { value: 3, count: 3, trunk: true },
-  { value: 4, count: 4, trunk: false },
-  { value: 5, count: 3, trunk: false },
-  { value: 6, count: 2, trunk: false },
+  { value: 2, count: 1, trunk: true },
+  { value: 3, count: 1, trunk: true },
+  { value: 4, count: 3, trunk: false },
+  { value: 5, count: 2, trunk: false },
+  { value: 6, count: 1, trunk: false },
   { value: 7, count: 1, trunk: false },
 ]
 
