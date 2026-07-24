@@ -4,7 +4,6 @@ import { StartScreen } from './ui/screens/StartScreen'
 import { PlayerSelectScreen } from './ui/screens/PlayerSelectScreen'
 import { ModeSelectScreen } from './ui/screens/ModeSelectScreen'
 import { LeaderboardScreen } from './ui/screens/LeaderboardScreen'
-import { StatisticsScreen } from './ui/screens/StatisticsScreen'
 import { SettingsScreen } from './ui/screens/SettingsScreen'
 
 // 3D-/Physik-Stack (Three.js + Rapier.js) erst laden, wenn tatsächlich gespielt wird (Teil 16.2).
@@ -36,8 +35,6 @@ function ScreenRouter() {
       )
     case 'leaderboard':
       return <LeaderboardScreen />
-    case 'statistics':
-      return <StatisticsScreen />
     case 'settings':
       return <SettingsScreen />
     default:

@@ -244,8 +244,8 @@ export function GameScreen() {
               <button className="btn" onClick={() => goTo('modeSelect')}>
                 Nochmal
               </button>
-              <button className="btn secondary" onClick={() => goTo('statistics')}>
-                Statistik
+              <button className="btn secondary" onClick={() => goTo('leaderboard')}>
+                Bestenliste
               </button>
               <button className="btn secondary" onClick={backToStartFromGameOver}>
                 Zum Start

@@ -14,6 +14,15 @@ function isStandalone(): boolean {
   return nav.standalone === true || window.matchMedia('(display-mode: standalone)').matches
 }
 
+/** iPhone/iPad Safari im Browser-Tab unterstützen die Fullscreen API grundsätzlich nicht - der
+ * einzige Weg, die Safari-Werkzeugleiste loszuwerden, ist "Zum Home-Bildschirm hinzufügen"
+ * (Teil 16.1). Erkennung inkl. iPadOS 13+, das sich als Desktop-Safari/MacIntel ausgibt. */
+function isIOS(): boolean {
+  const ua = navigator.userAgent
+  if (/iPad|iPhone|iPod/.test(ua)) return true
+  return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
+}
+
 /**
  * Vollbildmodus für mobile Browser (Teil 16.1): iOS Safari blendet die Werkzeugleiste im
  * Querformat nicht automatisch aus. Die Fullscreen API bzw. das Installieren als Homescreen-App
@@ -53,5 +62,5 @@ export function useFullscreen() {
   const el = document.documentElement as FullscreenElement
   const supported = typeof el.requestFullscreen === 'function' || typeof el.webkitRequestFullscreen === 'function'
 
-  return { isFullscreen, toggle, supported, isStandalone: isStandalone() }
+  return { isFullscreen, toggle, supported, isStandalone: isStandalone(), isIOS: isIOS() }
 }

@@ -451,6 +451,18 @@ button {
   width: 100%;
 }
 
+.leaderboard-scroll {
+  max-height: 72vh;
+  overflow-y: auto;
+  width: 100%;
+  max-width: 52rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding-bottom: 1rem;
+}
+
 .tannenbaum-tree {
   display: flex;
   flex-direction: column;

@@ -5,7 +5,7 @@ import { useFullscreen } from '../hooks/useFullscreen'
 export function StartScreen() {
   const goTo = useGameStore((s) => s.goTo)
   const openSettings = useGameStore((s) => s.openSettings)
-  const { isFullscreen, supported, isStandalone } = useFullscreen()
+  const { isFullscreen, supported, isStandalone, isIOS } = useFullscreen()
 
   return (
     <div className="screen">
@@ -23,7 +23,13 @@ export function StartScreen() {
         </button>
         <FullscreenButton />
       </div>
-      {supported && !isStandalone && !isFullscreen && (
+      {!isStandalone && isIOS && (
+        <p className="subtitle" style={{ fontSize: '0.8rem', opacity: 0.7 }}>
+          📲 iPhone/iPad-Tipp: Safari kann hier leider kein echtes Vollbild anzeigen. Für die beste Ansicht ohne
+          Browserleiste unten auf „Teilen” tippen und „Zum Home-Bildschirm” wählen.
+        </p>
+      )}
+      {!isStandalone && !isIOS && supported && !isFullscreen && (
         <p className="subtitle" style={{ fontSize: '0.8rem', opacity: 0.7 }}>
           Tipp: Für die beste Ansicht ohne Browserleiste „Vollbild” antippen oder die Seite über
           „Zum Home-Bildschirm” installieren.

@@ -1,9 +1,11 @@
 import type { DailyRecords } from '../game/dailyWinner'
+import { todayKey } from '../game/dateKey'
 import type { CharacterId, PlayerStatistics, Settings } from '../game/types'
 
 const STATS_KEY = 'kegeln-lembeck:stats:v1'
 const SETTINGS_KEY = 'kegeln-lembeck:settings:v1'
 const DAILY_KEY = 'kegeln-lembeck:daily:v1'
+const ALLTIME_KEY = 'kegeln-lembeck:alltime:v1'
 
 export function emptyStatistics(): PlayerStatistics {
   return {
@@ -28,11 +30,19 @@ export const DEFAULT_SETTINGS: Settings = {
   hapticsEnabled: true,
 }
 
+/** Lädt gespeicherte Statistiken und füllt bei jedem Spieler fehlende Felder mit ihren
+ * Standardwerten auf - sonst fehlen bei älteren, vor einem Feature-Update gespeicherten
+ * Datensätzen neue Felder (z. B. bestTannenbaum) komplett und rendern als "undefined". */
 export function loadAllStatistics(): Record<CharacterId, PlayerStatistics> {
   try {
     const raw = localStorage.getItem(STATS_KEY)
     if (!raw) return {} as Record<CharacterId, PlayerStatistics>
-    return JSON.parse(raw)
+    const parsed = JSON.parse(raw) as Record<CharacterId, Partial<PlayerStatistics>>
+    const result = {} as Record<CharacterId, PlayerStatistics>
+    for (const [id, stats] of Object.entries(parsed) as [CharacterId, Partial<PlayerStatistics>][]) {
+      result[id] = { ...emptyStatistics(), ...stats, achievements: stats.achievements ?? [] }
+    }
+    return result
   } catch {
     return {} as Record<CharacterId, PlayerStatistics>
   }
@@ -60,25 +70,42 @@ export function resetAllStatistics(): void {
   localStorage.removeItem(STATS_KEY)
 }
 
-function todayKey(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-/** Tagesrekorde für den Tagessieger: werden automatisch verworfen, sobald ein neuer Tag
- * beginnt - am Anfang jedes Tages hat also niemand Punkte (Teil: Tagessieger). */
-export function loadDailyRecords(): DailyRecords {
+/** Liest die gespeicherten Tagesrekorde unabhängig vom Datum - der Aufrufer entscheidet, ob
+ * ein gespeicherter Tag noch "heute" ist oder abgeschlossen werden muss (Teil: Tagessieger). */
+export function loadRawDaily(): { date: string; records: DailyRecords } | null {
   try {
     const raw = localStorage.getItem(DAILY_KEY)
-    if (!raw) return {}
-    const parsed = JSON.parse(raw) as { date: string; records: DailyRecords }
-    if (parsed.date !== todayKey()) return {}
-    return parsed.records ?? {}
+    if (!raw) return null
+    return JSON.parse(raw) as { date: string; records: DailyRecords }
   } catch {
-    return {}
+    return null
   }
 }
 
 export function saveDailyRecords(records: DailyRecords): void {
   localStorage.setItem(DAILY_KEY, JSON.stringify({ date: todayKey(), records }))
+}
+
+export function resetDailyRecords(): void {
+  localStorage.removeItem(DAILY_KEY)
+}
+
+/** Allzeit-Bestenliste der Tagessiege: je Tag bekommt der/die Tagessieger 1 Punkt (bei
+ * Gleichstand aufgeteilt), hier fortlaufend aufsummiert. */
+export function loadAllTimeBoard(): Partial<Record<CharacterId, number>> {
+  try {
+    const raw = localStorage.getItem(ALLTIME_KEY)
+    if (!raw) return {}
+    return JSON.parse(raw)
+  } catch {
+    return {}
+  }
+}
+
+export function saveAllTimeBoard(board: Partial<Record<CharacterId, number>>): void {
+  localStorage.setItem(ALLTIME_KEY, JSON.stringify(board))
+}
+
+export function resetAllTimeBoard(): void {
+  localStorage.removeItem(ALLTIME_KEY)
 }

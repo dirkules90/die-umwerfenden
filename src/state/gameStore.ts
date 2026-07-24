@@ -27,14 +27,19 @@ import {
   tannenbaumLeverPulled,
 } from '../game/tannenbaumMachine'
 import { ACHIEVEMENT_DEFS, grantAchievement, hasAchievement } from '../game/achievements'
-import { emptyDailyRecord, type DailyRecords } from '../game/dailyWinner'
+import { computeTotalDailyPoints, dailyWinners, emptyDailyRecord, type DailyRecords } from '../game/dailyWinner'
+import { todayKey } from '../game/dateKey'
 import {
   emptyStatistics,
   loadAllStatistics,
-  loadDailyRecords,
+  loadAllTimeBoard,
+  loadRawDaily,
   loadSettings,
   resetAllStatistics,
+  resetAllTimeBoard,
+  resetDailyRecords,
   saveAllStatistics,
+  saveAllTimeBoard,
   saveDailyRecords,
   saveSettings,
 } from '../storage/localStorageService'
@@ -48,7 +53,6 @@ export type Screen =
   | 'game'
   | 'tannenbaum'
   | 'leaderboard'
-  | 'statistics'
   | 'settings'
 
 const TOTAL_ROUNDS = 1
@@ -72,6 +76,7 @@ interface GameStore {
   tannenbaumSession: TannenbaumSession | null
   statistics: Record<CharacterId, PlayerStatistics>
   dailyRecords: DailyRecords
+  allTimeBoard: Partial<Record<CharacterId, number>>
   settings: Settings
   achievementBanner: AchievementBanner | null
   perGameCounters: Partial<Record<CharacterId, PerGameCounters>>
@@ -107,14 +112,51 @@ function statsFor(store: Record<CharacterId, PlayerStatistics>, id: CharacterId)
   return store[id] ?? emptyStatistics()
 }
 
+/**
+ * Tagesabschluss (Teil: All-Time-Bestenliste): eine echte "um 23:59:59 ausführen"-Aktion gibt es
+ * in einer rein clientseitigen PWA ohne Server nicht. Stattdessen wird beim nächsten App-Start
+ * geprüft, ob die gespeicherten Tagesrekorde von einem älteren Tag stammen - falls ja, wird für
+ * diesen abgelaufenen Tag einmalig der/die Tagessieger ermittelt, bekommt 1 Punkt (bei
+ * Gleichstand aufgeteilt) in der All-Time-Liste gutgeschrieben, und die Tagesdaten werden für den
+ * neuen Tag zurückgesetzt.
+ */
+function loadStatisticsAndDailyState(): {
+  statistics: Record<CharacterId, PlayerStatistics>
+  dailyRecords: DailyRecords
+  allTimeBoard: Partial<Record<CharacterId, number>>
+} {
+  const statistics = loadAllStatistics()
+  let allTimeBoard = loadAllTimeBoard()
+  const raw = loadRawDaily()
+
+  if (!raw || raw.date === todayKey()) {
+    return { statistics, dailyRecords: raw?.records ?? {}, allTimeBoard }
+  }
+
+  const staleDayTotals = computeTotalDailyPoints(raw.records, statistics, raw.date)
+  const { ids: winners } = dailyWinners(staleDayTotals)
+  if (winners.length > 0) {
+    const share = 1 / winners.length
+    const updatedBoard = { ...allTimeBoard }
+    for (const id of winners) updatedBoard[id] = (updatedBoard[id] ?? 0) + share
+    allTimeBoard = updatedBoard
+    saveAllTimeBoard(allTimeBoard)
+  }
+  saveDailyRecords({})
+  return { statistics, dailyRecords: {}, allTimeBoard }
+}
+
+const initialDailyState = loadStatisticsAndDailyState()
+
 export const useGameStore = create<GameStore>((set, get) => ({
   screen: 'start',
   settingsReturnTo: 'start',
   selectedPlayer: null,
   session: null,
   tannenbaumSession: null,
-  statistics: loadAllStatistics(),
-  dailyRecords: loadDailyRecords(),
+  statistics: initialDailyState.statistics,
+  dailyRecords: initialDailyState.dailyRecords,
+  allTimeBoard: initialDailyState.allTimeBoard,
   settings: loadSettings(),
   achievementBanner: null,
   perGameCounters: {},
@@ -277,9 +319,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
               countLow: ps.countLow + 1,
             }
           }
-          if (next.mode === 'hoch' && ps.bestHigh === 999 && !hasAchievement(ps, 'hausnummer-meister')) {
-            ps = grantAchievement(ps, 'hausnummer-meister')
-          }
           if (next.mode === 'niedrig' && ps.bestLow === 0 && !hasAchievement(ps, 'tiefstapler')) {
             ps = grantAchievement(ps, 'tiefstapler')
           }
@@ -294,6 +333,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           } else {
             dayRec.bestLow = dayRec.bestLow === null ? v : Math.min(dayRec.bestLow, v)
           }
+          dayRec.gamesPlayedToday += 1
           updatedDaily = { ...updatedDaily, [result.playerId]: dayRec }
           saveDailyRecords(updatedDaily)
         }
@@ -342,12 +382,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
       let ps = statsFor(statistics, player)
       const isBest = ps.bestTannenbaum === null || throwCount < ps.bestTannenbaum
-      ps = { ...ps, bestTannenbaum: isBest ? throwCount : ps.bestTannenbaum }
+      ps = { ...ps, bestTannenbaum: isBest ? throwCount : ps.bestTannenbaum, gamesPlayed: ps.gamesPlayed + 1 }
       const updatedStats = { ...statistics, [player]: ps }
       saveAllStatistics(updatedStats)
 
       const dayRec = { ...emptyDailyRecord(), ...dailyRecords[player] }
       dayRec.bestTannenbaum = dayRec.bestTannenbaum === null ? throwCount : Math.min(dayRec.bestTannenbaum, throwCount)
+      dayRec.gamesPlayedToday += 1
       const updatedDaily = { ...dailyRecords, [player]: dayRec }
       saveDailyRecords(updatedDaily)
 
@@ -390,7 +431,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   resetStatistics: () => {
     resetAllStatistics()
-    set({ statistics: {} as Record<CharacterId, PlayerStatistics> })
+    resetDailyRecords()
+    resetAllTimeBoard()
+    set({ statistics: {} as Record<CharacterId, PlayerStatistics>, dailyRecords: {}, allTimeBoard: {} })
   },
 
   updateSettings: (partial) => {
