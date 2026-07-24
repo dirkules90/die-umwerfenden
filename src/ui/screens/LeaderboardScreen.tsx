@@ -21,11 +21,11 @@ export function LeaderboardScreen() {
   // Alle sechs Spieler von Anfang an fest anzeigen (mit "-" bzw. 0 Punkten), statt die Liste
   // erst wachsen zu lassen, sobald jemand sein erstes Spiel überhaupt gespielt hat - so bleibt
   // die Zeilenzahl konstant und die Liste "springt" nicht.
-  const rows = CHARACTER_ORDER.map((id) => ({
-    id,
-    stats: statistics[id] ?? emptyStatistics(),
-    points: todayPoints[id] ?? 0,
-  })).sort((a, b) => b.points - a.points)
+  const rows = CHARACTER_ORDER.map((id) => {
+    const points = todayPoints[id] ?? 0
+    const bonus = achievementBonus[id] ?? 0
+    return { id, points, bonus, rankPoints: points - bonus }
+  }).sort((a, b) => b.points - a.points)
 
   const detailStats = statistics[selected] ?? emptyStatistics()
   const avgHigh = detailStats.countHigh > 0 ? (detailStats.totalScoreHigh / detailStats.countHigh).toFixed(1) : '–'
@@ -56,45 +56,36 @@ export function LeaderboardScreen() {
         )}
       </div>
 
-      <div className="panel" style={{ maxWidth: '46rem', width: '100%', overflowX: 'auto' }}>
+      <div className="panel" style={{ maxWidth: '32rem', width: '100%' }}>
         <table className="leaderboard-table">
           <thead>
             <tr>
               <th>#</th>
               <th>Spieler</th>
-              <th>Punkte heute</th>
-              <th>Beste Hoch</th>
-              <th>Beste Niedrig</th>
-              <th>Tannenbaum</th>
-              <th>Partien</th>
+              <th>Rang</th>
+              <th>🏆</th>
+              <th>Gesamt</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ id, stats, points }, i) => {
-              const bonus = achievementBonus[id] ?? 0
-              return (
-                <tr key={id}>
-                  <td>{i + 1}</td>
-                  <td>{AVATAR_CONFIGS[id].name}</td>
-                  <td>
-                    {points > 0 ? formatPoints(points) : '–'}
-                    {bonus > 0 && (
-                      <span style={{ opacity: 0.7, fontSize: '0.75em' }}> (davon 🏆{formatPoints(bonus)})</span>
-                    )}
-                  </td>
-                  <td>{stats.bestHigh !== null ? String(stats.bestHigh).padStart(3, '0') : '–'}</td>
-                  <td>{stats.bestLow !== null ? String(stats.bestLow).padStart(3, '0') : '–'}</td>
-                  <td>{stats.bestTannenbaum !== null ? `${stats.bestTannenbaum} Würfe` : '–'}</td>
-                  <td>{stats.gamesPlayed}</td>
-                </tr>
-              )
-            })}
+            {rows.map(({ id, points, bonus, rankPoints }, i) => (
+              <tr key={id}>
+                <td>{i + 1}</td>
+                <td>{AVATAR_CONFIGS[id].name}</td>
+                <td>{rankPoints > 0 ? formatPoints(rankPoints) : '–'}</td>
+                <td>{bonus > 0 ? formatPoints(bonus) : '–'}</td>
+                <td>
+                  <strong>{points > 0 ? formatPoints(points) : '–'}</strong>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
-      <p style={{ maxWidth: '46rem', fontSize: '0.68rem', opacity: 0.65, margin: 0 }}>
-        Punkte heute: Hausnummer Platz 1-3 = 3/2/1, Tannenbaum Platz 1-3 = 6/4/2, meiste Partien heute = 1, dazu
-        Achievement-Boni (🏆, siehe unten) - bei Gleichstand aufgeteilt.
+      <p style={{ maxWidth: '32rem', fontSize: '0.68rem', opacity: 0.65, margin: 0 }}>
+        Rang: Hausnummer Platz 1-3 = 3/2/1, Tannenbaum Platz 1-3 = 6/4/2, meiste Partien heute = 1 (bei Gleichstand
+        aufgeteilt). 🏆: Bonuspunkte für heute freigeschaltete Achievements (siehe unten). Beste Werte je Spieler:
+        Spieler-Buttons unten auswählen.
       </p>
 
       <button className="btn secondary" onClick={() => goTo('allTime')}>
@@ -164,9 +155,7 @@ export function LeaderboardScreen() {
             const unlocked = hasAchievement(detailStats, def.id)
             return (
               <div key={def.id} style={{ opacity: unlocked ? 1 : 0.4 }}>
-                {unlocked ? '🏆' : '🔒'} <strong>{def.title}</strong>
-                {def.bonusPoints > 0 && <span> (+{formatPoints(def.bonusPoints)} Punkte am Tag)</span>} –{' '}
-                {def.description}
+                {unlocked ? '🏆' : '🔒'} <strong>{def.title}</strong> – {def.description}
               </div>
             )
           })}

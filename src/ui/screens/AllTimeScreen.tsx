@@ -21,7 +21,7 @@ export function AllTimeScreen() {
         summiert die Tagessiege über alle Tage.
       </p>
 
-      <div className="panel" style={{ maxWidth: '30rem', width: '100%', overflowX: 'auto' }}>
+      <div className="panel" style={{ maxWidth: '30rem', width: '100%' }}>
         {rows.length === 0 ? (
           <p style={{ margin: 0, opacity: 0.85 }}>Noch kein abgeschlossener Tag.</p>
         ) : (

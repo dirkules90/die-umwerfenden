@@ -23,9 +23,9 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
     id: 'bahnrand-kenner',
     title: 'Bahnrand-Kenner',
     description: 'Drei Rinnenwürfe innerhalb einer Hausnummer',
-    bonusPoints: 0,
+    bonusPoints: 0.5,
   },
-  { id: 'stammgast', title: 'Stammgast', description: 'Zehn gespielte Partien insgesamt', bonusPoints: 0 },
+  { id: 'stammgast', title: 'Stammgast', description: 'Zehn gespielte Partien insgesamt', bonusPoints: 1 },
   {
     id: 'tiefstapler',
     title: 'Tiefstapler',

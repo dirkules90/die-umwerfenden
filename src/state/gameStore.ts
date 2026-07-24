@@ -229,7 +229,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
         soundManager.playAllNine()
         vibrate([40, 30, 40, 30, 80], settings.hapticsEnabled)
         let ps = statsFor(updatedStats, player)
-        ps = { ...ps, perfectThrows: ps.perfectThrows + 1 }
+        ps = {
+          ...ps,
+          perfectThrows: ps.perfectThrows + 1,
+          longestPerfectStreak: Math.max(ps.longestPerfectStreak, counters.perfectStreak),
+        }
         if (!hasAchievement(ps, 'volltreffer')) {
           ps = grantAchievement(ps, 'volltreffer')
           banner = { playerId: player, title: 'Volltreffer' }
