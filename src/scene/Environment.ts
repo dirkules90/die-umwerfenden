@@ -37,7 +37,6 @@ export class Environment {
     this.buildTrees()
     this.buildBenches()
     this.buildFootballPlaceholder()
-    this.buildSponsorBanners()
   }
 
   private buildSky() {
@@ -208,19 +207,5 @@ export class Environment {
       field.position.set(side * 22, 0.005, START_Z - 8)
       this.group.add(field)
     }
-  }
-
-  private buildSponsorBanners() {
-    // Fiktive Vereins-/Sponsorennamen (Teil 4.2) statt echter Marken.
-    const names = ['Vereinsbank Lembeck', 'Kies & Beton Dorsten eG']
-    names.forEach((_, i) => {
-      const banner = new THREE.Mesh(
-        new THREE.BoxGeometry(1.8, 0.5, 0.03),
-        toonMat(i === 0 ? 0x2e5b3e : 0xc0392b, 0.6),
-      )
-      banner.position.set((i === 0 ? -1 : 1) * (GUTTER_HALF_OUTER + 0.35), 0.9, START_Z - 1.5)
-      banner.rotation.y = (i === 0 ? 1 : -1) * 0.3
-      this.group.add(banner)
-    })
   }
 }

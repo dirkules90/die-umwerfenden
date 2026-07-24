@@ -1,7 +1,5 @@
-import { useEffect, useState } from 'react'
 import { useGameStore } from '../../state/gameStore'
 import { AVATAR_CONFIGS, CHARACTER_ORDER } from '../../characters/avatarConfigs'
-import { renderAvatarThumbnail } from '../../characters/avatarThumbnail'
 import type { CharacterId } from '../../game/types'
 
 export function PlayerSelectScreen() {
@@ -9,15 +7,6 @@ export function PlayerSelectScreen() {
   const togglePlayer = useGameStore((s) => s.togglePlayer)
   const reorderPlayers = useGameStore((s) => s.reorderPlayers)
   const goTo = useGameStore((s) => s.goTo)
-  const [thumbs, setThumbs] = useState<Partial<Record<CharacterId, string>>>({})
-
-  useEffect(() => {
-    const result: Partial<Record<CharacterId, string>> = {}
-    for (const id of CHARACTER_ORDER) {
-      result[id] = renderAvatarThumbnail(AVATAR_CONFIGS[id])
-    }
-    setThumbs(result)
-  }, [])
 
   function moveUp(id: CharacterId) {
     const idx = selectedPlayers.indexOf(id)
@@ -45,7 +34,7 @@ export function PlayerSelectScreen() {
               className={`char-tile ${selected ? 'selected' : ''}`}
               onClick={() => togglePlayer(id)}
             >
-              {thumbs[id] && <img src={thumbs[id]} alt={config.name} />}
+              <img src={config.photoUrl} alt={config.name} />
               <span className="name">{config.name}</span>
               {selected && (
                 <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>

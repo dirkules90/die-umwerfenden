@@ -13,6 +13,8 @@ export interface AvatarConfig {
   hasGlasses: boolean
   build: 'schlank' | 'mittel' | 'kraeftig'
   shirtAccent: string
+  /** Echtes Spielerfoto (vom Auftraggeber bereitgestellt), z. B. für Auswahl-Bildschirm und HUD. */
+  photoUrl: string
 }
 
 export interface Throw {

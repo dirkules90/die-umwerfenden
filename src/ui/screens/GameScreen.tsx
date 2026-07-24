@@ -156,6 +156,7 @@ export function GameScreen() {
 
       <div className="hud-layer">
         <div className="hud-top-left panel">
+          <img className="hud-avatar" src={playerConfig.photoUrl} alt={playerConfig.name} />
           <strong>{playerConfig.name}</strong>
           <span style={{ opacity: 0.8 }}>
             · Runde {session.currentRoundIndex + 1}/{session.totalRounds}
@@ -246,7 +247,8 @@ export function GameScreen() {
                 <strong>{String(lastRoundResult.houseNumber).padStart(3, '0')}</strong>
               </div>
             )}
-            <div className="panel">
+            <div className="panel" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <img className="hud-avatar" src={playerConfig.photoUrl} alt={playerConfig.name} />
               Am Zug: <strong>{playerConfig.name}</strong>
             </div>
           </div>

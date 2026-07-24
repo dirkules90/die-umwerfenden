@@ -170,6 +170,9 @@ button {
   aspect-ratio: 1;
   border-radius: 12px;
   background: rgba(0, 0, 0, 0.15);
+  object-fit: cover;
+  object-position: center top;
+  display: block;
 }
 
 .char-tile .name {
@@ -239,6 +242,16 @@ button {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.hud-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center top;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  flex-shrink: 0;
 }
 
 .hud-top-mid {

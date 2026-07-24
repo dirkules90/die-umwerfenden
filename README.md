@@ -74,10 +74,13 @@ Alle Teile 1–20 sind umgesetzt; ein paar Punkte im Detail:
   vorliegen, werden alle Klänge prozedural synthetisiert (Oszillatoren/Rauschgeneratoren) statt
   aus produzierten Audiodateien zu stammen. Produzierte Sounds lassen sich später 1:1 in
   `src/audio/soundManager.ts` einsetzen, ohne die Aufrufstellen zu ändern.
-- **Umgebung** (Teil 4): Bahn, Rinnen, Kegelstand, Vereinsheim, Bäume, Bänke und
-  Sponsorenbanner (mit frei erfundenen Namen) sind als stilisierte Cartoon-Geometrie umgesetzt,
-  nicht als detailgetreue Nachbildung der Referenzfotos (die diesem Lastenheft nicht als
-  Bilddateien beilagen).
+- **Umgebung** (Teil 4): Bahn, Rinnen, Kegelstand, Vereinsheim, Bäume und Bänke sind als
+  stilisierte Cartoon-Geometrie umgesetzt, nicht als detailgetreue Nachbildung der
+  Referenzfotos (die diesem Lastenheft nicht als Bilddateien beilagen). Die im Lastenheft
+  vorgesehenen Werbebanner am Bahnrand wurden auf Wunsch des Auftraggebers entfernt, da sie
+  im Spiel die Sicht auf die Bahn versperrten.
+- **Spielerfotos**: Statt generierter 3D-Kopf-Renderings verwendet die Charakterauswahl
+  echte, vom Auftraggeber bereitgestellte Fotos (`public/icons/<Name>.png`).
 - **Erweiterungen aus Teil 21** (Tag-/Nachtmodus, Wetter, Online-Highscores, weitere
   Kameraperspektive, König-Kegel-Sonderregel etc.) sind wie im Lastenheft festgelegt **nicht**
   Teil dieses ersten Entwicklungsumfangs.
