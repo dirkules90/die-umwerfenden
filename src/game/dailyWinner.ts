@@ -8,19 +8,17 @@ export interface DailyPlayerRecord {
   bestHigh: number | null
   bestLow: number | null
   bestTannenbaum: number | null
-  gamesPlayedToday: number
 }
 
 export type DailyRecords = Partial<Record<CharacterId, DailyPlayerRecord>>
 
 export function emptyDailyRecord(): DailyPlayerRecord {
-  return { bestHigh: null, bestLow: null, bestTannenbaum: null, gamesPlayedToday: 0 }
+  return { bestHigh: null, bestLow: null, bestTannenbaum: null }
 }
 
 // Platzpunkte je Kategorie: Index 0 = Platz 1, Index 1 = Platz 2, usw.
 const POINTS_HAUSNUMMER = [3, 2, 1]
 const POINTS_TANNENBAUM = [6, 4, 2]
-const POINTS_MEISTE_PARTIEN = [1]
 
 const ACHIEVEMENT_BONUS_BY_ID: Partial<Record<string, number>> = Object.fromEntries(
   ACHIEVEMENT_DEFS.map((d) => [d.id, d.bonusPoints]),
@@ -66,8 +64,10 @@ function rankPoints(
   return points
 }
 
-/** Rang-Punkte für Hohe/Niedrige Hausnummer, Tannenbaum und den Bonus für die meisten
- * Partien an einem Tag - noch ohne Achievement-Bonus (siehe computeAchievementBonus). */
+/** Rang-Punkte für Hohe/Niedrige Hausnummer und Tannenbaum - noch ohne Achievement-Bonus
+ * (siehe computeAchievementBonus). Bewusst keine eigene Kategorie mehr für "meiste Partien
+ * heute": das überschnitt sich unsichtbar mit dem Stammgast-Achievement (10 Partien insgesamt)
+ * und tauchte selbst nirgends in der Achievement-Liste auf. */
 export function computeDailyPoints(records: DailyRecords): Partial<Record<CharacterId, number>> {
   const points: Partial<Record<CharacterId, number>> = {}
   mergePoints(
@@ -81,15 +81,6 @@ export function computeDailyPoints(records: DailyRecords): Partial<Record<Charac
   mergePoints(
     points,
     rankPoints(records, (r) => r.bestTannenbaum, (a, b) => a < b, POINTS_TANNENBAUM),
-  )
-  mergePoints(
-    points,
-    rankPoints(
-      records,
-      (r) => (r.gamesPlayedToday > 0 ? r.gamesPlayedToday : null),
-      (a, b) => a > b,
-      POINTS_MEISTE_PARTIEN,
-    ),
   )
   return points
 }

@@ -325,7 +325,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
               countLow: ps.countLow + 1,
             }
           }
-          if (next.mode === 'niedrig' && ps.bestLow === 0 && !hasAchievement(ps, 'tiefstapler')) {
+          if (next.mode === 'niedrig' && ps.bestLow !== null && ps.bestLow <= 111 && !hasAchievement(ps, 'tiefstapler')) {
             ps = grantAchievement(ps, 'tiefstapler')
           }
           if (ps.gamesPlayed >= 10 && !hasAchievement(ps, 'stammgast')) {
@@ -339,7 +339,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
           } else {
             dayRec.bestLow = dayRec.bestLow === null ? v : Math.min(dayRec.bestLow, v)
           }
-          dayRec.gamesPlayedToday += 1
           updatedDaily = { ...updatedDaily, [result.playerId]: dayRec }
           saveDailyRecords(updatedDaily)
         }
@@ -394,7 +393,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
       const dayRec = { ...emptyDailyRecord(), ...dailyRecords[player] }
       dayRec.bestTannenbaum = dayRec.bestTannenbaum === null ? throwCount : Math.min(dayRec.bestTannenbaum, throwCount)
-      dayRec.gamesPlayedToday += 1
       const updatedDaily = { ...dailyRecords, [player]: dayRec }
       saveDailyRecords(updatedDaily)
 

@@ -62,8 +62,8 @@ export function LeaderboardScreen() {
             <tr>
               <th>#</th>
               <th>Spieler</th>
-              <th>Rang</th>
-              <th>🏆</th>
+              <th>Spielpunkte</th>
+              <th>Achievements</th>
               <th>Gesamt</th>
             </tr>
           </thead>
@@ -83,9 +83,9 @@ export function LeaderboardScreen() {
         </table>
       </div>
       <p style={{ maxWidth: '32rem', fontSize: '0.68rem', opacity: 0.65, margin: 0 }}>
-        Rang: Hausnummer Platz 1-3 = 3/2/1, Tannenbaum Platz 1-3 = 6/4/2, meiste Partien heute = 1 (bei Gleichstand
-        aufgeteilt). 🏆: Bonuspunkte für heute freigeschaltete Achievements (siehe unten). Beste Werte je Spieler:
-        Spieler-Buttons unten auswählen.
+        Spielpunkte: Hausnummer Platz 1-3 = 3/2/1, Tannenbaum Platz 1-3 = 6/4/2 (bei Gleichstand aufgeteilt).
+        Achievements: Bonuspunkte für heute freigeschaltete Achievements (siehe unten). Gesamt = Spielpunkte +
+        Achievements, daraus ergibt sich der Platz (#). Beste Werte je Spieler: Spieler-Buttons unten auswählen.
       </p>
 
       <button className="btn secondary" onClick={() => goTo('allTime')}>
@@ -153,9 +153,10 @@ export function LeaderboardScreen() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', textAlign: 'left' }}>
           {ACHIEVEMENT_DEFS.map((def) => {
             const unlocked = hasAchievement(detailStats, def.id)
+            const pointsLabel = def.bonusPoints.toString().replace('.', ',')
             return (
               <div key={def.id} style={{ opacity: unlocked ? 1 : 0.4 }}>
-                {unlocked ? '🏆' : '🔒'} <strong>{def.title}</strong> – {def.description}
+                {unlocked ? '🏆' : '🔒'} <strong>{def.title}</strong> ({pointsLabel} P.) – {def.description}
               </div>
             )
           })}

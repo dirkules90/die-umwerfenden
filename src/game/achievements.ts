@@ -29,7 +29,7 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
   {
     id: 'tiefstapler',
     title: 'Tiefstapler',
-    description: 'Bestwert 000 im Modus „Niedrige Hausnummer”',
+    description: 'Bestwert 111 oder niedriger im Modus „Niedrige Hausnummer”',
     bonusPoints: 0.5,
   },
 ]
