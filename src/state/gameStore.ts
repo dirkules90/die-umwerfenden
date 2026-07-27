@@ -234,11 +234,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
           perfectThrows: ps.perfectThrows + 1,
           longestPerfectStreak: Math.max(ps.longestPerfectStreak, counters.perfectStreak),
         }
-        if (!hasAchievement(ps, 'volltreffer')) {
+        if (!hasAchievement(ps, 'volltreffer', todayKey())) {
           ps = grantAchievement(ps, 'volltreffer')
           banner = { playerId: player, title: 'Volltreffer' }
         }
-        if (counters.perfectStreak >= 3 && !hasAchievement(ps, 'serientaeter')) {
+        if (counters.perfectStreak >= 3 && !hasAchievement(ps, 'serientaeter', todayKey())) {
           ps = grantAchievement(ps, 'serientaeter')
           banner = { playerId: player, title: 'Serientäter' }
         }
@@ -247,7 +247,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       if (effect.type === 'GUTTER') {
         let ps = statsFor(updatedStats, player)
         ps = { ...ps, gutterThrows: ps.gutterThrows + 1 }
-        if (counters.gutterCount >= GUTTER_STREAK_FOR_ACHIEVEMENT && !hasAchievement(ps, 'bahnrand-kenner')) {
+        if (counters.gutterCount >= GUTTER_STREAK_FOR_ACHIEVEMENT && !hasAchievement(ps, 'bahnrand-kenner', todayKey())) {
           ps = grantAchievement(ps, 'bahnrand-kenner')
           banner = { playerId: player, title: 'Bahnrand-Kenner' }
         }
