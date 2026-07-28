@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useGameStore } from '../../state/gameStore'
+import { cosmeticsFor, useGameStore } from '../../state/gameStore'
 import { LaneScene } from '../../scene/LaneScene'
 import { AVATAR_CONFIGS } from '../../characters/avatarConfigs'
 import { currentPlayer } from '../../game/gameStateMachine'
@@ -25,6 +25,7 @@ export function GameScreen() {
   const ballReturnComplete = useGameStore((s) => s.ballReturnComplete)
   const finalResult = useGameStore((s) => s.finalResult)
   const statistics = useGameStore((s) => s.statistics)
+  const cosmetics = useGameStore((s) => s.cosmetics)
   const goTo = useGameStore((s) => s.goTo)
   const backToStartFromGameOver = useGameStore((s) => s.backToStartFromGameOver)
   const pauseMenuOpen = useGameStore((s) => s.pauseMenuOpen)
@@ -49,7 +50,8 @@ export function GameScreen() {
       if (cancelled) return
       const el = containerRef.current
       if (el) scene.resize(el.clientWidth, el.clientHeight)
-      scene.setActiveCharacter(AVATAR_CONFIGS[currentPlayer(session)])
+      const activePlayer = currentPlayer(session)
+      scene.setActiveCharacter(AVATAR_CONFIGS[activePlayer], cosmeticsFor(cosmetics, activePlayer).loadout)
       setSceneReady(true)
     })
     return () => {

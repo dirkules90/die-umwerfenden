@@ -1,12 +1,14 @@
 import type { DailyRecords } from '../game/dailyWinner'
 import { todayKey } from '../game/dateKey'
-import type { CharacterId, PlayerStatistics, Settings } from '../game/types'
+import { defaultLoadout, emptyOwnership } from '../game/cosmetics'
+import type { AvatarConfig, CharacterCosmetics, CharacterId, PlayerStatistics, Settings } from '../game/types'
 
 const STATS_KEY = 'kegeln-lembeck:stats:v1'
 const SETTINGS_KEY = 'kegeln-lembeck:settings:v1'
 const DAILY_KEY = 'kegeln-lembeck:daily:v1'
 const ALLTIME_KEY = 'kegeln-lembeck:alltime:v1'
 const PIN_KEY = 'kegeln-lembeck:pins:v1'
+const COSMETICS_KEY = 'kegeln-lembeck:cosmetics:v1'
 
 /** Start-PIN jedes Charakters, bis er/sie sie einmal persönlich ändert (Teil: Charakter-PIN,
  * Vorstufe für den Kosmetik-Shop). Wie das Reset-Passwort keine echte Sicherheit, nur eine Hürde
@@ -129,4 +131,24 @@ export function loadPins(): Partial<Record<CharacterId, string>> {
 
 export function savePins(pins: Partial<Record<CharacterId, string>>): void {
   localStorage.setItem(PIN_KEY, JSON.stringify(pins))
+}
+
+export function emptyCosmetics(config: AvatarConfig): CharacterCosmetics {
+  return { coins: 0, loadout: defaultLoadout(config), ownership: emptyOwnership() }
+}
+
+/** Fehlende Einträge (noch nie geöffneter Shop) füllt der Aufrufer über emptyCosmetics(config)
+ * auf - hier bewusst nur roh geladen, ohne Kenntnis der jeweiligen AvatarConfig-Standardfarbe. */
+export function loadAllCosmetics(): Partial<Record<CharacterId, CharacterCosmetics>> {
+  try {
+    const raw = localStorage.getItem(COSMETICS_KEY)
+    if (!raw) return {}
+    return JSON.parse(raw)
+  } catch {
+    return {}
+  }
+}
+
+export function saveAllCosmetics(data: Partial<Record<CharacterId, CharacterCosmetics>>): void {
+  localStorage.setItem(COSMETICS_KEY, JSON.stringify(data))
 }

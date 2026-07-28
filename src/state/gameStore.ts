@@ -1,12 +1,15 @@
 import { create } from 'zustand'
 import type {
+  CharacterCosmetics,
   CharacterId,
   DigitSlot,
   GameMode,
   GameSession,
+  HairStyleId,
   PlayerStatistics,
   RoundResult,
   Settings,
+  ShirtStyleId,
   TannenbaumSession,
 } from '../game/types'
 import {
@@ -29,9 +32,13 @@ import {
 import { ACHIEVEMENT_DEFS, grantAchievement, hasAchievement } from '../game/achievements'
 import { computeTotalDailyPoints, dailyWinners, emptyDailyRecord, type DailyRecords } from '../game/dailyWinner'
 import { todayKey } from '../game/dateKey'
+import { AVATAR_CONFIGS } from '../characters/avatarConfigs'
+import { hairStylePrice, isHairStyleOwned, isShirtStyleOwned, shirtStylePrice, GLOVES_PRICE } from '../game/cosmetics'
 import {
   DEFAULT_PIN,
+  emptyCosmetics,
   emptyStatistics,
+  loadAllCosmetics,
   loadAllStatistics,
   loadAllTimeBoard,
   loadPins,
@@ -40,6 +47,7 @@ import {
   resetAllStatistics,
   resetAllTimeBoard,
   resetDailyRecords,
+  saveAllCosmetics,
   saveAllStatistics,
   saveAllTimeBoard,
   saveDailyRecords,
@@ -58,6 +66,8 @@ export type Screen =
   | 'leaderboard'
   | 'allTime'
   | 'settings'
+  | 'shopSelect'
+  | 'shop'
 
 const TOTAL_ROUNDS = 1
 const GUTTER_STREAK_FOR_ACHIEVEMENT = 3
@@ -82,6 +92,8 @@ interface GameStore {
   dailyRecords: DailyRecords
   allTimeBoard: Partial<Record<CharacterId, number>>
   pins: Partial<Record<CharacterId, string>>
+  cosmetics: Partial<Record<CharacterId, CharacterCosmetics>>
+  shopPlayer: CharacterId | null
   settings: Settings
   achievementBanner: AchievementBanner | null
   perGameCounters: Partial<Record<CharacterId, PerGameCounters>>
@@ -96,6 +108,11 @@ interface GameStore {
   selectPlayer: (id: CharacterId) => void
   verifyPin: (id: CharacterId, pin: string) => boolean
   changePin: (id: CharacterId, oldPin: string, newPin: string) => boolean
+  selectShopPlayer: (id: CharacterId) => void
+  setHairColor: (id: CharacterId, color: string) => void
+  equipOrBuyHairStyle: (id: CharacterId, style: HairStyleId) => boolean
+  equipOrBuyShirtStyle: (id: CharacterId, style: ShirtStyleId) => boolean
+  equipOrBuyGloves: (id: CharacterId, wantGloves: boolean) => boolean
   startGame: (mode: GameMode) => void
   beginAiming: () => void
   submitThrowResult: (pinsDown: number, isGutter: boolean) => void
@@ -118,6 +135,13 @@ interface GameStore {
 
 function statsFor(store: Record<CharacterId, PlayerStatistics>, id: CharacterId): PlayerStatistics {
   return store[id] ?? emptyStatistics()
+}
+
+export function cosmeticsFor(
+  store: Partial<Record<CharacterId, CharacterCosmetics>>,
+  id: CharacterId,
+): CharacterCosmetics {
+  return store[id] ?? emptyCosmetics(AVATAR_CONFIGS[id])
 }
 
 /**
@@ -166,6 +190,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   dailyRecords: initialDailyState.dailyRecords,
   allTimeBoard: initialDailyState.allTimeBoard,
   pins: loadPins(),
+  cosmetics: loadAllCosmetics(),
+  shopPlayer: null,
   settings: loadSettings(),
   achievementBanner: null,
   perGameCounters: {},
@@ -202,6 +228,71 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const pins = { ...get().pins, [id]: newPin }
     savePins(pins)
     set({ pins })
+    return true
+  },
+
+  selectShopPlayer: (id) => {
+    soundManager.playButtonClick()
+    set({ shopPlayer: id })
+  },
+
+  setHairColor: (id, color) => {
+    const current = cosmeticsFor(get().cosmetics, id)
+    const updated = { ...current, loadout: { ...current.loadout, hairColor: color } }
+    const cosmetics = { ...get().cosmetics, [id]: updated }
+    saveAllCosmetics(cosmetics)
+    set({ cosmetics })
+  },
+
+  equipOrBuyHairStyle: (id, style) => {
+    const current = cosmeticsFor(get().cosmetics, id)
+    let updated = current
+    if (!isHairStyleOwned(current.ownership, style)) {
+      const price = hairStylePrice(style)
+      if (current.coins < price) return false
+      updated = {
+        ...current,
+        coins: current.coins - price,
+        ownership: { ...current.ownership, hairStyles: [...current.ownership.hairStyles, style] },
+      }
+    }
+    updated = { ...updated, loadout: { ...updated.loadout, hairStyle: style } }
+    const cosmetics = { ...get().cosmetics, [id]: updated }
+    saveAllCosmetics(cosmetics)
+    set({ cosmetics })
+    return true
+  },
+
+  equipOrBuyShirtStyle: (id, style) => {
+    const current = cosmeticsFor(get().cosmetics, id)
+    let updated = current
+    if (!isShirtStyleOwned(current.ownership, style)) {
+      const price = shirtStylePrice(style)
+      if (current.coins < price) return false
+      updated = {
+        ...current,
+        coins: current.coins - price,
+        ownership: { ...current.ownership, shirtStyles: [...current.ownership.shirtStyles, style] },
+      }
+    }
+    updated = { ...updated, loadout: { ...updated.loadout, shirtStyle: style } }
+    const cosmetics = { ...get().cosmetics, [id]: updated }
+    saveAllCosmetics(cosmetics)
+    set({ cosmetics })
+    return true
+  },
+
+  equipOrBuyGloves: (id, wantGloves) => {
+    const current = cosmeticsFor(get().cosmetics, id)
+    let updated = current
+    if (wantGloves && !current.ownership.gloves) {
+      if (current.coins < GLOVES_PRICE) return false
+      updated = { ...current, coins: current.coins - GLOVES_PRICE, ownership: { ...current.ownership, gloves: true } }
+    }
+    updated = { ...updated, loadout: { ...updated.loadout, gloves: wantGloves } }
+    const cosmetics = { ...get().cosmetics, [id]: updated }
+    saveAllCosmetics(cosmetics)
+    set({ cosmetics })
     return true
   },
 

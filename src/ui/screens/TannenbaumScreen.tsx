@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useGameStore } from '../../state/gameStore'
+import { cosmeticsFor, useGameStore } from '../../state/gameStore'
 import { LaneScene } from '../../scene/LaneScene'
 import { AVATAR_CONFIGS } from '../../characters/avatarConfigs'
 import { useDragShoot } from '../hooks/useDragShoot'
@@ -18,6 +18,7 @@ export function TannenbaumScreen() {
   const tannenbaumBallReturnComplete = useGameStore((s) => s.tannenbaumBallReturnComplete)
   const tannenbaumResult = useGameStore((s) => s.tannenbaumResult)
   const statistics = useGameStore((s) => s.statistics)
+  const cosmetics = useGameStore((s) => s.cosmetics)
   const goTo = useGameStore((s) => s.goTo)
   const backToStartFromGameOver = useGameStore((s) => s.backToStartFromGameOver)
   const pauseMenuOpen = useGameStore((s) => s.pauseMenuOpen)
@@ -41,7 +42,7 @@ export function TannenbaumScreen() {
       if (cancelled) return
       const el = containerRef.current
       if (el) scene.resize(el.clientWidth, el.clientHeight)
-      scene.setActiveCharacter(AVATAR_CONFIGS[session.playerId])
+      scene.setActiveCharacter(AVATAR_CONFIGS[session.playerId], cosmeticsFor(cosmetics, session.playerId).loadout)
       setSceneReady(true)
     })
     return () => {

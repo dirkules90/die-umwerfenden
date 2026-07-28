@@ -23,7 +23,7 @@ import { Lever } from './Lever'
 import { CameraRig } from './CameraRig'
 import { Animator } from './Animator'
 import { CharacterModel } from '../characters/CharacterModel'
-import type { AvatarConfig } from '../game/types'
+import type { AvatarConfig, CosmeticLoadout } from '../game/types'
 
 type ThrowPhase = 'idle' | 'aiming' | 'rolling' | 'settled'
 
@@ -175,9 +175,9 @@ export class LaneScene {
     this.scene.add(fill)
   }
 
-  setActiveCharacter(config: AvatarConfig) {
+  setActiveCharacter(config: AvatarConfig, cosmetics: CosmeticLoadout) {
     if (this.character) this.scene.remove(this.character.group)
-    this.character = new CharacterModel(config)
+    this.character = new CharacterModel(config, cosmetics)
     this.character.group.position.copy(CHARACTER_STAND)
     // Modell blickt lokal in +Z; die Kamera steht hinter dem Spieler und schaut Richtung
     // Kegelstand (-Z), daher um 180° drehen, damit der Spieler zur Bahn blickt statt zur Kamera.

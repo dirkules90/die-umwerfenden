@@ -18,6 +18,9 @@ export function StartScreen() {
         <button className="btn secondary" onClick={() => goTo('leaderboard')}>
           Bestenliste
         </button>
+        <button className="btn secondary" onClick={() => goTo('shopSelect')}>
+          Shop
+        </button>
         <button className="btn secondary" onClick={() => openSettings('start')}>
           Einstellungen
         </button>

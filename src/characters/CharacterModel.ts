@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import type { AvatarConfig } from '../game/types'
+import type { AvatarConfig, CosmeticLoadout, HairStyleId, ShirtStyleId } from '../game/types'
 
 export type CharacterAnimState = 'idle' | 'backswing' | 'throw' | 'cheer' | 'disappointed'
 
@@ -13,10 +13,53 @@ const ARM_LENGTH = 0.34
 const SHOULDER_Y = 0.97
 const SHOULDER_X = 0.27
 
+// Gecachte Textur für das "Die Umwerfenden"-Shirt-Badge (Teil: Kosmetik-Shop) - dieselbe Textur
+// wird bei jedem Charakterwechsel und jeder Shop-Vorschau neu gebraucht, ein wiederholter
+// Netzwerk-/Decode-Aufwand pro CharacterModel-Instanz wäre unnötig.
+let umwerfendenBadgeTexture: THREE.Texture | null = null
+function getUmwerfendenBadgeTexture(): THREE.Texture {
+  if (!umwerfendenBadgeTexture) {
+    umwerfendenBadgeTexture = new THREE.TextureLoader().load(
+      `${import.meta.env.BASE_URL}icons/logo-icon-source.png`,
+    )
+    umwerfendenBadgeTexture.colorSpace = THREE.SRGBColorSpace
+  }
+  return umwerfendenBadgeTexture
+}
+
+/** Blitz-Symbol als CanvasTexture gezeichnet statt als Bilddatei - hält das Badge unabhängig von
+ * externen Assets und leicht in der Akzentfarbe des Shirts einfärgbar. */
+function buildBlitzBadgeTexture(): THREE.Texture {
+  const canvas = document.createElement('canvas')
+  canvas.width = 128
+  canvas.height = 128
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = '#f4d03f'
+  ctx.beginPath()
+  ctx.moveTo(70, 8)
+  ctx.lineTo(30, 70)
+  ctx.lineTo(58, 70)
+  ctx.lineTo(50, 120)
+  ctx.lineTo(98, 55)
+  ctx.lineTo(68, 55)
+  ctx.closePath()
+  ctx.fillStyle = '#e8b923'
+  ctx.lineWidth = 6
+  ctx.strokeStyle = '#6b4a06'
+  ctx.fill()
+  ctx.stroke()
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  return texture
+}
+
 /**
  * Stilisiertes Low-Poly Cartoon-Modell (Teil 5.4 / 11.2) – kein Fotorealismus, rein abstrahiert.
  * Arme hängen an Schulter-Pivots (statt an ihrem eigenen Mittelpunkt), damit Wurf-/Ausholanimationen
  * sich glaubwürdig um das Schultergelenk drehen statt durch den Körper zu rotieren.
+ *
+ * cosmetics (Teil: Kosmetik-Shop) bestimmt Frisur, Haarfarbe, Shirt-Design und Handschuhe -
+ * unabhängig von der festen AvatarConfig (Statur, Hautfarbe, Bart/Brille bleiben Charaktermerkmale).
  */
 export class CharacterModel {
   group = new THREE.Group()
@@ -29,16 +72,17 @@ export class CharacterModel {
   private stateElapsed = 0
   private backswingAmount = 0
 
-  constructor(config: AvatarConfig) {
+  constructor(config: AvatarConfig, cosmetics: CosmeticLoadout) {
     const scale = BUILD_SCALE[config.build]
     this.group.scale.setScalar(scale)
 
     const skinMat = new THREE.MeshStandardMaterial({ color: config.skinColor, roughness: 0.7 })
     const shirtMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 })
     const accentMat = new THREE.MeshStandardMaterial({ color: config.shirtAccent, roughness: 0.8 })
-    const hairMat = new THREE.MeshStandardMaterial({ color: config.hairColor, roughness: 0.6 })
+    const hairMat = new THREE.MeshStandardMaterial({ color: cosmetics.hairColor, roughness: 0.6 })
     const pantsMat = new THREE.MeshStandardMaterial({ color: 0x3a4a5c, roughness: 0.9 })
     const shoeMat = new THREE.MeshStandardMaterial({ color: 0x2a2420, roughness: 0.6 })
+    const gloveMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.5 })
 
     // Beine + Schuhe (Boden bis Hüfte y=0.58)
     for (const side of [-1, 1]) {
@@ -68,6 +112,8 @@ export class CharacterModel {
     collar.rotation.x = Math.PI / 2
     this.torsoGroup.add(collar)
 
+    this.buildShirtBadge(cosmetics.shirtStyle)
+
     this.group.add(this.torsoGroup)
 
     // Hals (verhindert, dass Kopf und Torso ineinander clippen)
@@ -91,6 +137,12 @@ export class CharacterModel {
       hand.position.y = -ARM_LENGTH
       pivot.add(hand)
 
+      if (cosmetics.gloves) {
+        const glove = new THREE.Mesh(new THREE.SphereGeometry(0.068, 10, 8), gloveMat)
+        glove.position.y = -ARM_LENGTH
+        pivot.add(glove)
+      }
+
       pivot.rotation.z = sign * 0.08
       this.group.add(pivot)
     }
@@ -100,12 +152,7 @@ export class CharacterModel {
     const head = new THREE.Mesh(new THREE.SphereGeometry(headRadius, 20, 16), skinMat)
     this.headGroup.add(head)
 
-    const hair = new THREE.Mesh(
-      new THREE.SphereGeometry(headRadius * 1.05, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.62),
-      hairMat,
-    )
-    hair.position.y = 0.015
-    this.headGroup.add(hair)
+    this.buildHair(hairMat, headRadius, cosmetics.hairStyle)
 
     // Augen - ohne diese wirkt der Kopf ausdruckslos/leer.
     const eyeWhiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 })
@@ -149,6 +196,67 @@ export class CharacterModel {
     this.headGroup.position.y = 1.12 + headRadius
     this.headGroup.castShadow = true
     this.group.add(this.headGroup)
+  }
+
+  /** Vier Frisuren zur Auswahl (Teil: Kosmetik-Shop) - deutlich unterscheidbare Silhouetten statt
+   * feiner Detailvarianten, damit man auf einen Blick erkennt, welche gerade ausgerüstet ist. */
+  private buildHair(hairMat: THREE.Material, headRadius: number, style: HairStyleId) {
+    switch (style) {
+      case 'kurz': {
+        const hair = new THREE.Mesh(
+          new THREE.SphereGeometry(headRadius * 1.08, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.42),
+          hairMat,
+        )
+        hair.position.y = 0.05
+        this.headGroup.add(hair)
+        break
+      }
+      case 'lang': {
+        const cap = new THREE.Mesh(
+          new THREE.SphereGeometry(headRadius * 1.05, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.62),
+          hairMat,
+        )
+        cap.position.y = 0.015
+        this.headGroup.add(cap)
+        const back = new THREE.Mesh(new THREE.CapsuleGeometry(headRadius * 0.55, headRadius * 1.1, 4, 8), hairMat)
+        back.position.set(0, -headRadius * 0.55, -headRadius * 0.55)
+        back.rotation.x = 0.15
+        this.headGroup.add(back)
+        break
+      }
+      case 'irokese': {
+        const spikeCount = 5
+        for (let i = 0; i < spikeCount; i++) {
+          const t = i / (spikeCount - 1) - 0.5
+          const spike = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.22, 8), hairMat)
+          spike.position.set(0, headRadius + 0.09 - Math.abs(t) * 0.06, t * headRadius * 1.35)
+          spike.rotation.x = -t * 0.9
+          this.headGroup.add(spike)
+        }
+        break
+      }
+      case 'standard':
+      default: {
+        const hair = new THREE.Mesh(
+          new THREE.SphereGeometry(headRadius * 1.05, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.62),
+          hairMat,
+        )
+        hair.position.y = 0.015
+        this.headGroup.add(hair)
+        break
+      }
+    }
+  }
+
+  /** Shirt-Badge auf der Brust (Teil: Kosmetik-Shop) - eine kleine texturierte Fläche knapp vor
+   * der Torso-Oberfläche statt eines UV-verzerrten Prints direkt auf der Kapsel-Geometrie. */
+  private buildShirtBadge(style: ShirtStyleId) {
+    if (style === 'standard') return
+    const texture = style === 'umwerfenden' ? getUmwerfendenBadgeTexture() : buildBlitzBadgeTexture()
+    const badgeMat = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.8, transparent: true })
+    const badge = new THREE.Mesh(new THREE.CircleGeometry(0.085, 20), badgeMat)
+    badge.position.set(0, 0.86, 0.185)
+    this.torsoGroup.add(badge)
   }
 
   setAnimState(state: CharacterAnimState) {

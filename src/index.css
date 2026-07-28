@@ -656,3 +656,104 @@ h3 {
     opacity: 0.2;
   }
 }
+
+/* Kosmetik-Shop (Teil: Shop) */
+
+.shop-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.shop-coins {
+  position: absolute;
+  top: env(safe-area-inset-top, 0.8rem);
+  right: max(0.8rem, env(safe-area-inset-right, 0.8rem));
+  font-weight: 700;
+  padding: 0.5rem 0.9rem;
+}
+
+.shop-layout {
+  display: flex;
+  gap: 1.2rem;
+  width: 100%;
+  max-width: 64rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.shop-preview-wrap {
+  flex: 0 0 16rem;
+  width: 16rem;
+  height: 20rem;
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.shop-preview-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.shop-options {
+  flex: 1 1 20rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  text-align: left;
+  min-width: 18rem;
+}
+
+.shop-section h3 {
+  font-size: 1rem;
+}
+
+.shop-option-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.shop-option-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.5rem 0.8rem;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-light);
+  font-weight: 600;
+  font-size: 0.85rem;
+  min-height: 44px;
+}
+
+.shop-option-btn.active {
+  border-color: #7cffb0;
+  background: rgba(124, 255, 176, 0.18);
+}
+
+.shop-price {
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+.shop-owned {
+  font-size: 0.7rem;
+  opacity: 0.75;
+  color: #7cffb0;
+}
+
+.shop-color-input {
+  width: 4rem;
+  height: 2.6rem;
+  border: none;
+  border-radius: 10px;
+  padding: 0.2rem;
+  background: rgba(255, 255, 255, 0.1);
+}

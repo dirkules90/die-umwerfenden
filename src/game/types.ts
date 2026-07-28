@@ -17,6 +17,33 @@ export interface AvatarConfig {
   photoUrl: string
 }
 
+export type HairStyleId = 'standard' | 'kurz' | 'lang' | 'irokese'
+export type ShirtStyleId = 'standard' | 'blitz' | 'umwerfenden'
+
+/** Individuelle Erscheinung eines Charakters im 3D-Modell (Teil: Kosmetik-Shop) - unabhängig von
+ * der festen AvatarConfig (Statur, Hautfarbe, Bart/Brille bleiben Charaktermerkmale, keine
+ * Shop-Ware). hairColor ist bewusst frei wählbar statt fest wie in AvatarConfig. */
+export interface CosmeticLoadout {
+  hairStyle: HairStyleId
+  hairColor: string
+  shirtStyle: ShirtStyleId
+  gloves: boolean
+}
+
+/** Welche Items ein Charakter bereits gekauft hat - 'standard' ist immer und für alle kostenlos
+ * verfügbar, taucht deshalb hier nicht extra auf. */
+export interface CosmeticOwnership {
+  hairStyles: HairStyleId[]
+  shirtStyles: ShirtStyleId[]
+  gloves: boolean
+}
+
+export interface CharacterCosmetics {
+  coins: number
+  loadout: CosmeticLoadout
+  ownership: CosmeticOwnership
+}
+
 export interface Throw {
   playerId: CharacterId
   pinsDown: number
