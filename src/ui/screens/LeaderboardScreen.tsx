@@ -150,17 +150,18 @@ export function LeaderboardScreen() {
 
       <div className="panel" style={{ maxWidth: '30rem', width: '100%' }}>
         <h3 style={{ marginTop: 0 }}>Achievements</h3>
+        <p style={{ margin: '0 0 0.6rem', fontSize: '0.75rem', opacity: 0.7 }}>
+          Alle Achievements setzen sich täglich zurück und lassen sich jeden Tag neu erreichen.
+        </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', textAlign: 'left' }}>
           {ACHIEVEMENT_DEFS.map((def) => {
-            // Wiederholbare Achievements werden mit dateKey geprüft: an einem neuen Tag zeigt
-            // die Liste sie wieder als gesperrt, bis die Leistung erneut erbracht wird.
-            // Lebenszeit-Meilensteine bleiben dauerhaft freigeschaltet.
+            // Mit dateKey geprüft: an einem neuen Tag zeigt die Liste ein Achievement wieder als
+            // gesperrt, bis die Leistung an diesem Tag erneut erbracht wird.
             const unlocked = hasAchievement(detailStats, def.id, todayKey())
             const pointsLabel = def.bonusPoints.toString().replace('.', ',')
             return (
               <div key={def.id} style={{ opacity: unlocked ? 1 : 0.4 }}>
                 {unlocked ? '🏆' : '🔒'} <strong>{def.title}</strong> ({pointsLabel} P.) – {def.description}
-                {def.repeatable && <span style={{ opacity: 0.6, fontSize: '0.75rem' }}> (täglich wiederholbar)</span>}
               </div>
             )
           })}

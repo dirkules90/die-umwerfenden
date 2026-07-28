@@ -3,17 +3,19 @@ import { dateKeyFor } from './dateKey'
 import type { CharacterId, PlayerStatistics } from './types'
 
 /** Tagesbestwerte je Spieler (Teil: Tagessieger). Nur befüllt, sobald ein Spiel dieser
- * Kategorie an diesem Tag zu Ende gespielt wurde. */
+ * Kategorie an diesem Tag zu Ende gespielt wurde. gamesPlayedToday zählt alle Spielmodi und ist
+ * die Grundlage für das Stammgast-Achievement (siehe achievements.ts). */
 export interface DailyPlayerRecord {
   bestHigh: number | null
   bestLow: number | null
   bestTannenbaum: number | null
+  gamesPlayedToday: number
 }
 
 export type DailyRecords = Partial<Record<CharacterId, DailyPlayerRecord>>
 
 export function emptyDailyRecord(): DailyPlayerRecord {
-  return { bestHigh: null, bestLow: null, bestTannenbaum: null }
+  return { bestHigh: null, bestLow: null, bestTannenbaum: null, gamesPlayedToday: 0 }
 }
 
 // Platzpunkte je Kategorie: Index 0 = Platz 1, Index 1 = Platz 2, usw.

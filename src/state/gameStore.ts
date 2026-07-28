@@ -325,13 +325,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
               countLow: ps.countLow + 1,
             }
           }
-          if (next.mode === 'niedrig' && ps.bestLow !== null && ps.bestLow <= 111 && !hasAchievement(ps, 'tiefstapler')) {
-            ps = grantAchievement(ps, 'tiefstapler')
-          }
-          if (ps.gamesPlayed >= 10 && !hasAchievement(ps, 'stammgast')) {
-            ps = grantAchievement(ps, 'stammgast')
-          }
-          updatedStats = { ...updatedStats, [result.playerId]: ps }
 
           const dayRec = { ...emptyDailyRecord(), ...updatedDaily[result.playerId] }
           if (next.mode === 'hoch') {
@@ -339,8 +332,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
           } else {
             dayRec.bestLow = dayRec.bestLow === null ? v : Math.min(dayRec.bestLow, v)
           }
+          dayRec.gamesPlayedToday += 1
           updatedDaily = { ...updatedDaily, [result.playerId]: dayRec }
           saveDailyRecords(updatedDaily)
+
+          // Stammgast/Tiefstapler bewusst auf Tageswerten statt Lebenszeit-Rekorden: so bleiben
+          // sie wie die übrigen Achievements an jedem neuen Tag wieder frisch erreichbar, statt
+          // Spieler, die den Meilenstein längst irgendwann erreicht haben, dauerhaft zu bevorzugen.
+          if (next.mode === 'niedrig' && dayRec.bestLow !== null && dayRec.bestLow <= 111 && !hasAchievement(ps, 'tiefstapler', todayKey())) {
+            ps = grantAchievement(ps, 'tiefstapler')
+          }
+          if (dayRec.gamesPlayedToday >= 5 && !hasAchievement(ps, 'stammgast', todayKey())) {
+            ps = grantAchievement(ps, 'stammgast')
+          }
+          updatedStats = { ...updatedStats, [result.playerId]: ps }
         }
         saveAllStatistics(updatedStats)
         soundManager.stopAmbientLoop()
@@ -388,13 +393,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
       let ps = statsFor(statistics, player)
       const isBest = ps.bestTannenbaum === null || throwCount < ps.bestTannenbaum
       ps = { ...ps, bestTannenbaum: isBest ? throwCount : ps.bestTannenbaum, gamesPlayed: ps.gamesPlayed + 1 }
-      const updatedStats = { ...statistics, [player]: ps }
-      saveAllStatistics(updatedStats)
 
       const dayRec = { ...emptyDailyRecord(), ...dailyRecords[player] }
       dayRec.bestTannenbaum = dayRec.bestTannenbaum === null ? throwCount : Math.min(dayRec.bestTannenbaum, throwCount)
+      dayRec.gamesPlayedToday += 1
       const updatedDaily = { ...dailyRecords, [player]: dayRec }
       saveDailyRecords(updatedDaily)
+
+      if (dayRec.gamesPlayedToday >= 5 && !hasAchievement(ps, 'stammgast', todayKey())) {
+        ps = grantAchievement(ps, 'stammgast')
+      }
+      const updatedStats = { ...statistics, [player]: ps }
+      saveAllStatistics(updatedStats)
 
       soundManager.stopAmbientLoop()
       set({
