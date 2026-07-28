@@ -19,6 +19,9 @@ export interface AvatarConfig {
 
 export type HairStyleId = 'standard' | 'kurz' | 'lang' | 'irokese'
 export type ShirtStyleId = 'standard' | 'blitz' | 'umwerfenden'
+/** 'none' fällt auf die feste Charakterbrille (AvatarConfig.hasGlasses) zurück, falls vorhanden -
+ * eine gekaufte Shop-Brille ersetzt diese sonst optisch (Teil: Shop-Erweiterung). */
+export type GlassesStyleId = 'none' | 'cool' | 'abgespaced'
 
 /** Individuelle Erscheinung eines Charakters im 3D-Modell (Teil: Kosmetik-Shop) - unabhängig von
  * der festen AvatarConfig (Statur, Hautfarbe, Bart/Brille bleiben Charaktermerkmale, keine
@@ -28,14 +31,20 @@ export interface CosmeticLoadout {
   hairColor: string
   shirtStyle: ShirtStyleId
   gloves: boolean
+  glassesStyle: GlassesStyleId
+  watch: boolean
+  headband: boolean
 }
 
-/** Welche Items ein Charakter bereits gekauft hat - 'standard' ist immer und für alle kostenlos
- * verfügbar, taucht deshalb hier nicht extra auf. */
+/** Welche Items ein Charakter bereits gekauft hat - 'standard'/'none' sind immer und für alle
+ * kostenlos verfügbar, tauchen deshalb hier nicht extra auf. */
 export interface CosmeticOwnership {
   hairStyles: HairStyleId[]
   shirtStyles: ShirtStyleId[]
   gloves: boolean
+  glassesStyles: GlassesStyleId[]
+  watch: boolean
+  headband: boolean
 }
 
 export interface CharacterCosmetics {

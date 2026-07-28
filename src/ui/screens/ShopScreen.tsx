@@ -3,15 +3,20 @@ import { cosmeticsFor, useGameStore } from '../../state/gameStore'
 import { AVATAR_CONFIGS, CHARACTER_ORDER } from '../../characters/avatarConfigs'
 import { CharacterPreviewScene } from '../../characters/CharacterPreviewScene'
 import {
+  GLASSES_STYLES,
   GLOVES_PRICE,
   HAIRSTYLES,
+  HEADBAND_PRICE,
   SHIRTS,
+  WATCH_PRICE,
+  glassesStylePrice,
   hairStylePrice,
+  isGlassesStyleOwned,
   isHairStyleOwned,
   isShirtStyleOwned,
   shirtStylePrice,
 } from '../../game/cosmetics'
-import type { CosmeticLoadout, HairStyleId, ShirtStyleId } from '../../game/types'
+import type { CosmeticLoadout, GlassesStyleId, HairStyleId, ShirtStyleId } from '../../game/types'
 
 export function ShopScreen() {
   const shopPlayer = useGameStore((s) => s.shopPlayer)
@@ -21,6 +26,9 @@ export function ShopScreen() {
   const equipOrBuyHairStyle = useGameStore((s) => s.equipOrBuyHairStyle)
   const equipOrBuyShirtStyle = useGameStore((s) => s.equipOrBuyShirtStyle)
   const equipOrBuyGloves = useGameStore((s) => s.equipOrBuyGloves)
+  const equipOrBuyGlasses = useGameStore((s) => s.equipOrBuyGlasses)
+  const equipOrBuyWatch = useGameStore((s) => s.equipOrBuyWatch)
+  const equipOrBuyHeadband = useGameStore((s) => s.equipOrBuyHeadband)
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -95,6 +103,30 @@ export function ShopScreen() {
     setError('')
   }
 
+  function confirmGlasses(style: GlassesStyleId) {
+    if (!equipOrBuyGlasses(shopPlayer!, style)) {
+      setError('Nicht genug Münzen für diese Sonnenbrille.')
+      return
+    }
+    setError('')
+  }
+
+  function confirmWatch(want: boolean) {
+    if (!equipOrBuyWatch(shopPlayer!, want)) {
+      setError('Nicht genug Münzen für die Uhr.')
+      return
+    }
+    setError('')
+  }
+
+  function confirmHeadband(want: boolean) {
+    if (!equipOrBuyHeadband(shopPlayer!, want)) {
+      setError('Nicht genug Münzen für das Stirnband.')
+      return
+    }
+    setError('')
+  }
+
   return (
     <div className="screen shop-screen">
       <button className="btn secondary screen-nav" onClick={() => goTo('start')}>
@@ -107,7 +139,7 @@ export function ShopScreen() {
         <h2 style={{ margin: 0 }}>Shop von {config.name}</h2>
       </div>
       <p className="subtitle" style={{ maxWidth: '30rem' }}>
-        Münzen gibt es demnächst fürs Spielen - Frisur und Haarfarbe kannst du jetzt schon anpassen.
+        Münzen gibt es fürs Spielen, für Achievements und für den Wochensieg.
       </p>
 
       <div className="shop-layout">
@@ -219,6 +251,95 @@ export function ShopScreen() {
                 onClick={() => confirmGloves(draft.gloves)}
               >
                 {!draft.gloves || ownership.gloves ? 'Ausrüsten' : `Kaufen für ${GLOVES_PRICE} 🪙`}
+              </button>
+            )}
+          </section>
+
+          <section className="shop-section panel">
+            <h3 style={{ marginTop: 0 }}>Sonnenbrille</h3>
+            <div className="shop-option-row">
+              {GLASSES_STYLES.map((g) => {
+                const owned = isGlassesStyleOwned(ownership, g.id)
+                return (
+                  <button
+                    key={g.id}
+                    className={`shop-option-btn ${draft.glassesStyle === g.id ? 'active' : ''}`}
+                    onClick={() => setDraft((d) => ({ ...d, glassesStyle: g.id }))}
+                  >
+                    <span>{g.title}</span>
+                    {!owned && <span className="shop-price">🪙 {g.price}</span>}
+                    {owned && loadout.glassesStyle === g.id && <span className="shop-owned">Ausgerüstet</span>}
+                  </button>
+                )
+              })}
+            </div>
+            {draft.glassesStyle !== loadout.glassesStyle && (
+              <button
+                className="btn"
+                disabled={!isGlassesStyleOwned(ownership, draft.glassesStyle) && coins < glassesStylePrice(draft.glassesStyle)}
+                onClick={() => confirmGlasses(draft.glassesStyle)}
+              >
+                {isGlassesStyleOwned(ownership, draft.glassesStyle)
+                  ? 'Ausrüsten'
+                  : `Kaufen für ${glassesStylePrice(draft.glassesStyle)} 🪙`}
+              </button>
+            )}
+          </section>
+
+          <section className="shop-section panel">
+            <h3 style={{ marginTop: 0 }}>Armbanduhr</h3>
+            <div className="shop-option-row">
+              <button
+                className={`shop-option-btn ${!draft.watch ? 'active' : ''}`}
+                onClick={() => setDraft((d) => ({ ...d, watch: false }))}
+              >
+                Ohne
+              </button>
+              <button
+                className={`shop-option-btn ${draft.watch ? 'active' : ''}`}
+                onClick={() => setDraft((d) => ({ ...d, watch: true }))}
+              >
+                <span>Goldene Uhr</span>
+                {!ownership.watch && <span className="shop-price">🪙 {WATCH_PRICE}</span>}
+                {ownership.watch && loadout.watch && <span className="shop-owned">Ausgerüstet</span>}
+              </button>
+            </div>
+            {draft.watch !== loadout.watch && (
+              <button
+                className="btn"
+                disabled={draft.watch && !ownership.watch && coins < WATCH_PRICE}
+                onClick={() => confirmWatch(draft.watch)}
+              >
+                {!draft.watch || ownership.watch ? 'Ausrüsten' : `Kaufen für ${WATCH_PRICE} 🪙`}
+              </button>
+            )}
+          </section>
+
+          <section className="shop-section panel">
+            <h3 style={{ marginTop: 0 }}>Stirnband</h3>
+            <div className="shop-option-row">
+              <button
+                className={`shop-option-btn ${!draft.headband ? 'active' : ''}`}
+                onClick={() => setDraft((d) => ({ ...d, headband: false }))}
+              >
+                Ohne
+              </button>
+              <button
+                className={`shop-option-btn ${draft.headband ? 'active' : ''}`}
+                onClick={() => setDraft((d) => ({ ...d, headband: true }))}
+              >
+                <span>Mit Stirnband</span>
+                {!ownership.headband && <span className="shop-price">🪙 {HEADBAND_PRICE}</span>}
+                {ownership.headband && loadout.headband && <span className="shop-owned">Ausgerüstet</span>}
+              </button>
+            </div>
+            {draft.headband !== loadout.headband && (
+              <button
+                className="btn"
+                disabled={draft.headband && !ownership.headband && coins < HEADBAND_PRICE}
+                onClick={() => confirmHeadband(draft.headband)}
+              >
+                {!draft.headband || ownership.headband ? 'Ausrüsten' : `Kaufen für ${HEADBAND_PRICE} 🪙`}
               </button>
             )}
           </section>

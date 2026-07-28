@@ -33,12 +33,29 @@ export interface SettleResult {
   wasAllNine: boolean
 }
 
+/** Stimmung eines Wurfs (Teil: Reaktions-Mimik) - wird vom Aufrufer (GameScreen/TannenbaumScreen)
+ * bestimmt, da nur der jeweils Spielmodus weiß, ob z.B. eine 3 bei "Hoch" schlecht und bei
+ * "Niedrig" gut ist. Ohne evaluateMood (siehe releaseThrow) fällt die Szene auf eine einfache,
+ * modusunabhängige Einschätzung zurück. */
+export type ThrowMood = 'happy' | 'meh' | 'sad'
+
 // Kamera muss HINTER dem Charakter stehen (größerer Z-Wert), sonst blickt sie an ihm
 // vorbei nach vorn und der Werfer ist nie im Bild.
 const CHARACTER_STAND = new THREE.Vector3(0, 0, START_Z + 0.9)
 const PRE_THROW_POS = new THREE.Vector3(0.75, 2.0, START_Z + 3.1)
 const PRE_THROW_LOOK = new THREE.Vector3(0, 0.75, PIN_STAND_Z + 1)
 const FORWARD_DIR = new THREE.Vector3(0, 0, -1)
+
+/** Kamera-Framing für die Reaktions-Einstellung nach dem Ergebnis-Blick auf die Kegel (Teil:
+ * Kamera-Zoom je nach Reaktion) - näher/enger bei Freude und Trauer für den emotionalen Moment,
+ * etwas weiter bei "naja" für einen ruhigeren, beiläufigeren Eindruck. */
+function reactionCameraFor(mood: ThrowMood): { pos: THREE.Vector3; look: THREE.Vector3 } {
+  const z = CHARACTER_STAND.z
+  const look = new THREE.Vector3(0, 1.3, z)
+  if (mood === 'happy') return { pos: new THREE.Vector3(0.9, 1.55, z - 1.9), look }
+  if (mood === 'sad') return { pos: new THREE.Vector3(0.5, 1.28, z - 1.1), look }
+  return { pos: new THREE.Vector3(0.7, 1.4, z - 1.55), look }
+}
 
 export class LaneScene {
   private renderer: THREE.WebGLRenderer
@@ -56,6 +73,7 @@ export class LaneScene {
   private throwPhase: ThrowPhase = 'idle'
   private settleTimerMs = 0
   private onSettled: ((result: SettleResult) => void) | null = null
+  private moodEvaluator: ((pinsDown: number, isGutter: boolean) => ThrowMood) | null = null
   private allNineTriggered = false
   private slowMoElapsed = 0
   private slowMoActive = false
@@ -213,7 +231,13 @@ export class LaneScene {
     this.cameraRig.dollyToward(PRE_THROW_POS, PRE_THROW_LOOK, FORWARD_DIR, pullFraction * 0.8)
   }
 
-  releaseThrow(power: number, angleDeg: number, spin: number, onSettled: (result: SettleResult) => void) {
+  releaseThrow(
+    power: number,
+    angleDeg: number,
+    spin: number,
+    onSettled: (result: SettleResult) => void,
+    evaluateMood?: (pinsDown: number, isGutter: boolean) => ThrowMood,
+  ) {
     this.aimTrajectory.visible = false
     this.character?.setAnimState('throw')
     this.ball.applyThrow(power, angleDeg, spin)
@@ -223,6 +247,7 @@ export class LaneScene {
     this.allNineTriggered = false
     this.slowMoActive = false
     this.onSettled = onSettled
+    this.moodEvaluator = evaluateMood ?? null
   }
 
   showLeverPhase() {
@@ -362,12 +387,15 @@ export class LaneScene {
     )
   }
 
-  celebrate() {
-    this.character?.setAnimState('cheer')
-  }
-
-  disappoint() {
-    this.character?.setAnimState('disappointed')
+  /** Löst Mimik/Bewegung + eine passende Kamera-Einstellung für die jeweilige Stimmung aus (Teil:
+   * Reaktions-Mimik / Kamera-Zoom je nach Reaktion). */
+  private reactToThrow(mood: ThrowMood) {
+    const animState = mood === 'happy' ? 'cheer' : mood === 'sad' ? 'disappointed' : 'meh'
+    this.character?.setAnimState(animState)
+    window.setTimeout(() => {
+      const { pos, look } = reactionCameraFor(mood)
+      this.cameraRig.tweenTo(pos, look, 0.45)
+    }, 480)
   }
 
   /** Aktualisiert das Sticky-Flag jedes Kegels an Hand des aktuellen Winkels (siehe Pin.everFallen). */
@@ -482,12 +510,19 @@ export class LaneScene {
         const wasAllNine = pinsDown === 9 && !isGutter
         const resultLook = new THREE.Vector3(0, 0.3, PIN_STAND_Z)
         const resultPos = new THREE.Vector3(0.8, 1.3, PIN_STAND_Z + 2.2)
-        this.cameraRig.tweenTo(resultPos, resultLook, 1.0)
-        if (wasAllNine) this.celebrate()
-        else if (isGutter || pinsDown === 0) this.disappoint()
+        this.cameraRig.tweenTo(resultPos, resultLook, 0.5)
+
+        // Alle-Neune sticht als Stimmung immer heraus (seltener Achievement-Moment), sonst
+        // entscheidet der Aufrufer modusabhängig (siehe releaseThrow evaluateMood) - ohne
+        // Evaluator eine einfache, modusunabhängige Einschätzung als Rückfalloption.
+        const mood: ThrowMood = wasAllNine
+          ? 'happy'
+          : (this.moodEvaluator?.(pinsDown, isGutter) ?? (isGutter || pinsDown === 0 ? 'sad' : 'meh'))
+        this.reactToThrow(mood)
+
         const cb = this.onSettled
         this.onSettled = null
-        window.setTimeout(() => cb?.({ pinsDown, isGutter, wasAllNine }), 900)
+        window.setTimeout(() => cb?.({ pinsDown, isGutter, wasAllNine }), 1300)
       }
     }
 

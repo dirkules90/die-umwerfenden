@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { cosmeticsFor, useGameStore } from '../../state/gameStore'
-import { LaneScene } from '../../scene/LaneScene'
+import { LaneScene, type ThrowMood } from '../../scene/LaneScene'
 import { AVATAR_CONFIGS } from '../../characters/avatarConfigs'
 import { useDragShoot } from '../hooks/useDragShoot'
 import { useLeverDrag } from '../hooks/useLeverDrag'
@@ -10,6 +10,13 @@ import { ConfettiOverlay } from '../components/ConfettiOverlay'
 import { ControlsHelp } from '../components/ControlsHelp'
 import { FullscreenButton } from '../components/FullscreenButton'
 import { TannenbaumTree } from '../components/TannenbaumTree'
+
+/** Beim Tannenbaum gibt es bewusst nur Freude oder Trauer, kein "naja" (Teil: Reaktions-Mimik) -
+ * ein Wurf trifft entweder eine noch offene Zahl oder verpufft wirkungslos, ein Mittelding gibt es
+ * hier nicht. */
+function evaluateTannenbaumMood(remaining: Record<number, number>, pinsDown: number): ThrowMood {
+  return remaining[pinsDown] > 0 ? 'happy' : 'sad'
+}
 
 export function TannenbaumScreen() {
   const session = useGameStore((s) => s.tannenbaumSession)
@@ -93,9 +100,12 @@ export function TannenbaumScreen() {
     },
     onAimUpdate: (pull, angle) => sceneRef.current?.updateAim(pull, angle),
     onRelease: (power, angle, spin) => {
-      if (!sceneRef.current) return
+      if (!sceneRef.current || !session) return
       setInFlight(true)
-      sceneRef.current.releaseThrow(power, angle, spin, handleThrowSettled)
+      const remaining = session.remaining
+      sceneRef.current.releaseThrow(power, angle, spin, handleThrowSettled, (pinsDown) =>
+        evaluateTannenbaumMood(remaining, pinsDown),
+      )
     },
     onCancel: () => {
       sceneRef.current?.beginAimPhase()

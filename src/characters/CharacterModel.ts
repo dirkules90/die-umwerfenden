@@ -1,7 +1,131 @@
 import * as THREE from 'three'
-import type { AvatarConfig, CosmeticLoadout, HairStyleId, ShirtStyleId } from '../game/types'
+import type { AvatarConfig, CosmeticLoadout, GlassesStyleId, HairStyleId, ShirtStyleId } from '../game/types'
 
-export type CharacterAnimState = 'idle' | 'backswing' | 'throw' | 'cheer' | 'disappointed'
+export type CharacterAnimState = 'idle' | 'backswing' | 'throw' | 'cheer' | 'meh' | 'disappointed'
+
+type Mood = 'neutral' | 'happy' | 'meh' | 'sad'
+
+const STATE_MOOD: Record<CharacterAnimState, Mood> = {
+  idle: 'neutral',
+  backswing: 'neutral',
+  throw: 'neutral',
+  cheer: 'happy',
+  meh: 'meh',
+  disappointed: 'sad',
+}
+
+/**
+ * Bemaltes Mii-artiges Gesicht statt einzelner 3D-Geometrie für Augen/Mund (Teil: Charaktermodell-
+ * Überarbeitung, Vorbild Wii-Bowling-Mii) - ein Canvas-Portrait pro Stimmung wird auf einen kleinen,
+ * gewölbten Kugelausschnitt direkt vor dem Kopf projiziert. Der Hintergrund entspricht exakt der
+ * Hautfarbe des Charakters, damit der Rand des Ausschnitts unsichtbar mit der Kopfkugel verschmilzt,
+ * statt wie ein aufgeklebter Sticker mit sichtbarer Kante zu wirken.
+ */
+function buildFaceTexture(mood: Mood, skinColor: string): THREE.CanvasTexture {
+  const W = 256
+  const H = 224
+  const canvas = document.createElement('canvas')
+  canvas.width = W
+  canvas.height = H
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = skinColor
+  ctx.fillRect(0, 0, W, H)
+
+  const cx = W / 2
+  const eyeY = 96
+  const eyeDX = 52
+  const leftX = cx - eyeDX
+  const rightX = cx + eyeDX
+  const ink = '#241f1a'
+
+  // Augenbrauen - Position/Neigung transportiert die Stimmung mindestens so stark wie die Augen.
+  ctx.fillStyle = ink
+  for (const side of [-1, 1]) {
+    const bx = cx + side * eyeDX
+    ctx.save()
+    ctx.translate(bx, eyeY - 40)
+    if (mood === 'sad') ctx.rotate(side * -0.32)
+    else if (mood === 'happy') ctx.rotate(side * 0.12)
+    else if (mood === 'meh') ctx.rotate(side * 0.22 * -1)
+    ctx.fillRect(-26, -5, 52, 10)
+    ctx.restore()
+  }
+
+  if (mood === 'happy') {
+    // Fröhlich zugekniffene Augen (^‿^) statt offener Augäpfel.
+    ctx.strokeStyle = ink
+    ctx.lineWidth = 9
+    ctx.lineCap = 'round'
+    for (const x of [leftX, rightX]) {
+      ctx.beginPath()
+      ctx.arc(x, eyeY + 14, 22, Math.PI, Math.PI * 2)
+      ctx.stroke()
+    }
+  } else {
+    for (const x of [leftX, rightX]) {
+      const squint = mood === 'sad' ? 0.8 : 1
+      ctx.fillStyle = '#ffffff'
+      ctx.strokeStyle = ink
+      ctx.lineWidth = 4
+      ctx.beginPath()
+      ctx.ellipse(x, eyeY, 25, 28 * squint, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.stroke()
+      ctx.fillStyle = ink
+      ctx.beginPath()
+      ctx.arc(x, eyeY + (mood === 'sad' ? 6 : 3), 11, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#ffffff'
+      ctx.beginPath()
+      ctx.arc(x - 4, eyeY - 3, 4, 0, Math.PI * 2)
+      ctx.fill()
+    }
+  }
+
+  if (mood === 'sad') {
+    // Träne unter dem rechten Auge - klar erkennbares "schlechter Wurf"-Signal auch aus der Distanz.
+    ctx.fillStyle = '#6fc3ff'
+    ctx.beginPath()
+    ctx.moveTo(rightX + 18, eyeY + 22)
+    ctx.quadraticCurveTo(rightX + 28, eyeY + 44, rightX + 18, eyeY + 54)
+    ctx.quadraticCurveTo(rightX + 8, eyeY + 44, rightX + 18, eyeY + 22)
+    ctx.fill()
+  }
+
+  // Mund: fröhlicher Bogen, gerade Linie oder trauriger Bogen.
+  ctx.strokeStyle = ink
+  ctx.fillStyle = ink
+  ctx.lineWidth = 8
+  ctx.lineCap = 'round'
+  const mouthY = 158
+  if (mood === 'happy') {
+    ctx.beginPath()
+    ctx.arc(cx, mouthY - 14, 34, Math.PI * 0.12, Math.PI * 0.88)
+    ctx.fill()
+  } else if (mood === 'sad') {
+    ctx.beginPath()
+    ctx.arc(cx, mouthY + 26, 30, Math.PI * 1.2, Math.PI * 1.8)
+    ctx.stroke()
+  } else if (mood === 'meh') {
+    ctx.save()
+    ctx.translate(cx, mouthY)
+    ctx.rotate(0.08)
+    ctx.beginPath()
+    ctx.moveTo(-26, 0)
+    ctx.lineTo(26, 0)
+    ctx.stroke()
+    ctx.restore()
+  } else {
+    ctx.beginPath()
+    ctx.moveTo(cx - 24, mouthY)
+    ctx.quadraticCurveTo(cx, mouthY + 10, cx + 24, mouthY)
+    ctx.stroke()
+  }
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  return texture
+}
 
 const BUILD_SCALE: Record<AvatarConfig['build'], number> = {
   schlank: 0.92,
@@ -68,6 +192,8 @@ export class CharacterModel {
   private torsoGroup = new THREE.Group()
   private leftArmPivot = new THREE.Group()
   private rightArmPivot = new THREE.Group()
+  private faceMesh: THREE.Mesh | null = null
+  private faceTextures: Record<Mood, THREE.Texture> | null = null
   private time = 0
   private state: CharacterAnimState = 'idle'
   private stateElapsed = 0
@@ -157,39 +283,58 @@ export class CharacterModel {
       this.group.add(pivot)
     }
 
-    // Kopf (großer Kopf im Verhältnis zum Körper, Mii-artig, Teil 5.4)
+    if (cosmetics.watch) {
+      // Goldene Uhr am rechten Handgelenk (Teil: Shop-Erweiterung) - rein kosmetisch, keine
+      // Spielwirkung, daher bewusst nur an einem festen Arm statt konfigurierbar.
+      const goldMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, roughness: 0.3, metalness: 0.6 })
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.062, 0.014, 8, 12), goldMat)
+      band.rotation.x = Math.PI / 2
+      band.position.y = -ARM_LENGTH + 0.09
+      this.rightArmPivot.add(band)
+      const face = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.012, 12), goldMat)
+      face.rotation.x = Math.PI / 2
+      face.position.set(0, -ARM_LENGTH + 0.09, 0.045)
+      this.rightArmPivot.add(face)
+    }
+
+    // Kopf (großer Kopf im Verhältnis zum Körper, Mii-artig, Teil 5.4), leicht eiförmig statt
+    // perfekt rund gestreckt (Teil: Charaktermodell-Überarbeitung) - näher am Wii-Mii-Vorbild.
     const headRadius = 0.2
-    const head = new THREE.Mesh(new THREE.SphereGeometry(headRadius, 20, 16), skinMat)
+    const head = new THREE.Mesh(new THREE.SphereGeometry(headRadius, 24, 18), skinMat)
+    head.scale.set(1, 1.08, 0.94)
     this.headGroup.add(head)
 
     this.buildHair(hairMat, headRadius, cosmetics.hairStyle)
 
-    // Augen - ohne diese wirkt der Kopf ausdruckslos/leer. Pupille sitzt bewusst deutlich vor dem
-    // Weiß statt knapp darin eingebettet zu sein: vorher lag sie fast komplett innerhalb der
-    // weißen Kugel und blitzte nur als dünner, ringartiger Rand hervor statt als klarer Punkt.
-    const eyeWhiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 })
-    const pupilMat = new THREE.MeshStandardMaterial({ color: 0x241f1a, roughness: 0.3 })
-    const eyeWhiteRadius = 0.032
-    const eyeZ = headRadius * 0.9
-    for (const side of [-1, 1]) {
-      const eyeWhite = new THREE.Mesh(new THREE.SphereGeometry(eyeWhiteRadius, 12, 10), eyeWhiteMat)
-      eyeWhite.position.set(side * 0.075, 0.01, eyeZ)
-      this.headGroup.add(eyeWhite)
-      const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.017, 10, 8), pupilMat)
-      pupil.position.set(side * 0.075, 0.01, eyeZ + eyeWhiteRadius - 0.006)
-      this.headGroup.add(pupil)
+    // Bemaltes Gesicht statt einzelner Augen-/Mund-Geometrie (Teil: Charaktermodell-Überarbeitung,
+    // Vorbild Wii-Bowling-Mii) - ein Canvas-Portrait pro Stimmung, aufgezogen auf einen kleinen, der
+    // Kopfkrümmung angepassten Kugelausschnitt. setAnimState tauscht später nur die Textur aus.
+    this.faceTextures = {
+      neutral: buildFaceTexture('neutral', config.skinColor),
+      happy: buildFaceTexture('happy', config.skinColor),
+      meh: buildFaceTexture('meh', config.skinColor),
+      sad: buildFaceTexture('sad', config.skinColor),
     }
-
-    // Einfacher Mund für etwas Persönlichkeit.
-    const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.008, 6, 10, Math.PI), pupilMat)
-    mouth.position.set(0, -0.075, headRadius * 0.94)
-    mouth.rotation.z = Math.PI
-    this.headGroup.add(mouth)
+    const faceMat = new THREE.MeshStandardMaterial({ map: this.faceTextures.neutral, roughness: 0.75 })
+    const facePhiWidth = 1.25
+    const faceThetaHeight = 1.1
+    const faceGeo = new THREE.SphereGeometry(
+      headRadius * 1.006,
+      20,
+      16,
+      Math.PI / 2 - facePhiWidth / 2,
+      facePhiWidth,
+      Math.PI / 2 - faceThetaHeight / 2,
+      faceThetaHeight,
+    )
+    this.faceMesh = new THREE.Mesh(faceGeo, faceMat)
+    this.faceMesh.scale.set(1, 1.08, 0.94)
+    this.headGroup.add(this.faceMesh)
 
     if (config.hasBeard) {
       // thetaStart vorher bei 0.45π: die Bart-Oberkante lag dadurch auf Höhe des Munds statt
       // darunter, sah aus wie ein Bart, der durch den Mund reicht. 0.55π beginnt spürbar unter
-      // der Mundhöhe (y=-0.075).
+      // der Mundhöhe.
       const beard = new THREE.Mesh(
         new THREE.SphereGeometry(headRadius * 0.78, 12, 10, 0, Math.PI * 2, Math.PI * 0.55, Math.PI * 0.32),
         hairMat,
@@ -198,21 +343,49 @@ export class CharacterModel {
       this.headGroup.add(beard)
     }
 
-    if (config.hasGlasses) {
-      const glassMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.3 })
-      for (const side of [-1, 1]) {
-        const lens = new THREE.Mesh(new THREE.TorusGeometry(0.048, 0.011, 8, 16), glassMat)
-        lens.position.set(side * 0.078, 0.01, headRadius * 0.92)
-        this.headGroup.add(lens)
-      }
-      const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.011, 0.011), glassMat)
-      bridge.position.set(0, 0.01, headRadius * 0.94)
-      this.headGroup.add(bridge)
+    // Shop-Sonnenbrille ersetzt die feste Charakterbrille optisch, wenn ausgerüstet - sonst fällt
+    // die Anzeige auf das feste Charaktermerkmal zurück (Teil: Shop-Erweiterung).
+    const effectiveGlasses: GlassesStyleId =
+      cosmetics.glassesStyle !== 'none' ? cosmetics.glassesStyle : config.hasGlasses ? 'cool' : 'none'
+    if (effectiveGlasses !== 'none') {
+      this.buildGlasses(effectiveGlasses, headRadius)
+    }
+
+    if (cosmetics.headband) {
+      const bandMat = new THREE.MeshStandardMaterial({ color: 0xe0483c, roughness: 0.6 })
+      const headband = new THREE.Mesh(new THREE.TorusGeometry(headRadius * 0.99, 0.018, 8, 20), bandMat)
+      headband.rotation.x = Math.PI / 2
+      headband.position.y = headRadius * 0.3
+      this.headGroup.add(headband)
     }
 
     this.headGroup.position.y = 1.12 + headRadius
     this.headGroup.castShadow = true
     this.group.add(this.headGroup)
+  }
+
+  /** 'cool' = dezente dunkle Gläser, 'abgespaced' = zweifarbig-neonbunt mit auffälligem Rahmen
+   * (Teil: Shop-Erweiterung) - deutlich unterscheidbare Optik statt nur leichter Farbvarianten. */
+  private buildGlasses(style: GlassesStyleId, headRadius: number) {
+    const isWild = style === 'abgespaced'
+    const frameMat = new THREE.MeshStandardMaterial({ color: isWild ? 0xffe14d : 0x1a1a1a, roughness: 0.3 })
+    const lensColors = isWild ? [0xff2fb0, 0x2fe0ff] : [0x1a1a1a, 0x1a1a1a]
+    ;[-1, 1].forEach((side, i) => {
+      const lens = new THREE.Mesh(new THREE.TorusGeometry(0.048, 0.011, 8, 16), frameMat)
+      lens.position.set(side * 0.078, 0.01, headRadius * 0.92)
+      this.headGroup.add(lens)
+      const lensMat = new THREE.MeshStandardMaterial({
+        color: lensColors[i],
+        roughness: 0.25,
+        metalness: isWild ? 0.3 : 0,
+      })
+      const glass = new THREE.Mesh(new THREE.CircleGeometry(0.046, 16), lensMat)
+      glass.position.set(side * 0.078, 0.01, headRadius * 0.925)
+      this.headGroup.add(glass)
+    })
+    const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.011, 0.011), frameMat)
+    bridge.position.set(0, 0.01, headRadius * 0.94)
+    this.headGroup.add(bridge)
   }
 
   /** Vier Frisuren zur Auswahl (Teil: Kosmetik-Shop) - deutlich unterscheidbare Silhouetten statt
@@ -284,7 +457,17 @@ export class CharacterModel {
     if (this.state !== state) {
       this.state = state
       this.stateElapsed = 0
+      this.applyMood(STATE_MOOD[state])
     }
+  }
+
+  /** Tauscht nur die Gesichtstextur (siehe buildFaceTexture) statt Geometrie neu zu bauen - günstig
+   * genug, um bei jedem Stimmungswechsel (siehe setAnimState) aufgerufen zu werden. */
+  private applyMood(mood: Mood) {
+    if (!this.faceMesh || !this.faceTextures) return
+    const mat = this.faceMesh.material as THREE.MeshStandardMaterial
+    mat.map = this.faceTextures[mood]
+    mat.needsUpdate = true
   }
 
   setBackswingAmount(amount: number) {
@@ -308,12 +491,16 @@ export class CharacterModel {
         const amt = this.backswingAmount
         this.rightArmPivot.rotation.x = -amt * 1.7
         this.torsoGroup.rotation.x = amt * 0.15
+        // Leichtes Einsinken beim Ausholen, damit der Wurf wie eine echte Körperbewegung wirkt statt
+        // nur eine reine Armdrehung zu sein (Teil: Wurf-Animation).
+        this.group.position.y = -amt * 0.045
         break
       }
       case 'throw': {
         const t = Math.min(this.stateElapsed / 0.4, 1)
         this.rightArmPivot.rotation.x = THREE.MathUtils.lerp(-1.7, 0.7, t)
         this.torsoGroup.rotation.x = THREE.MathUtils.lerp(0.15, -0.05, t)
+        this.group.position.y = THREE.MathUtils.lerp(-0.045, 0, t)
         break
       }
       case 'cheer': {
@@ -323,9 +510,21 @@ export class CharacterModel {
         this.rightArmPivot.rotation.x = -2.6
         break
       }
+      case 'meh': {
+        const settle = Math.min(this.stateElapsed / 0.6, 1)
+        const shrug = Math.sin(Math.min(this.stateElapsed * 6, Math.PI)) * 0.3 * (1 - settle * 0.4)
+        this.leftArmPivot.rotation.x = -shrug
+        this.rightArmPivot.rotation.x = -shrug
+        this.headGroup.rotation.z = Math.sin(this.stateElapsed * 4) * 0.07 * (1 - settle)
+        break
+      }
       case 'disappointed': {
         this.headGroup.rotation.x = Math.min(this.stateElapsed * 2, 0.3)
         this.torsoGroup.rotation.x = Math.min(this.stateElapsed * 1.5, 0.2)
+        // Enttäuscht hängende Arme statt der neutralen Ruhehaltung (Teil: Reaktions-Mimik).
+        const droop = Math.min(this.stateElapsed * 2, 1)
+        this.leftArmPivot.rotation.x = droop * 0.35
+        this.rightArmPivot.rotation.x = droop * 0.35
         break
       }
     }

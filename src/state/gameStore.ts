@@ -5,6 +5,7 @@ import type {
   DigitSlot,
   GameMode,
   GameSession,
+  GlassesStyleId,
   HairStyleId,
   PlayerStatistics,
   RoundResult,
@@ -33,7 +34,17 @@ import { ACHIEVEMENT_DEFS, achievementCoinReward, grantAchievement, hasAchieveme
 import { computeTotalDailyPoints, dailyWinners, emptyDailyRecord, type DailyRecords } from '../game/dailyWinner'
 import { currentWeekKey, todayKey } from '../game/dateKey'
 import { AVATAR_CONFIGS } from '../characters/avatarConfigs'
-import { hairStylePrice, isHairStyleOwned, isShirtStyleOwned, shirtStylePrice, GLOVES_PRICE } from '../game/cosmetics'
+import {
+  hairStylePrice,
+  isHairStyleOwned,
+  isShirtStyleOwned,
+  isGlassesStyleOwned,
+  shirtStylePrice,
+  glassesStylePrice,
+  GLOVES_PRICE,
+  WATCH_PRICE,
+  HEADBAND_PRICE,
+} from '../game/cosmetics'
 import { coinsForHausnummer, coinsForTannenbaum, WEEKLY_WINNER_COIN_BONUS } from '../game/coins'
 import {
   DEFAULT_PIN,
@@ -121,6 +132,9 @@ interface GameStore {
   equipOrBuyHairStyle: (id: CharacterId, style: HairStyleId) => boolean
   equipOrBuyShirtStyle: (id: CharacterId, style: ShirtStyleId) => boolean
   equipOrBuyGloves: (id: CharacterId, wantGloves: boolean) => boolean
+  equipOrBuyGlasses: (id: CharacterId, style: GlassesStyleId) => boolean
+  equipOrBuyWatch: (id: CharacterId, wantWatch: boolean) => boolean
+  equipOrBuyHeadband: (id: CharacterId, wantHeadband: boolean) => boolean
   startGame: (mode: GameMode) => void
   beginAiming: () => void
   submitThrowResult: (pinsDown: number, isGutter: boolean) => void
@@ -145,11 +159,21 @@ function statsFor(store: Record<CharacterId, PlayerStatistics>, id: CharacterId)
   return store[id] ?? emptyStatistics()
 }
 
+/** Fehlende Unterfelder (z.B. glassesStyle/watch/headband bei vor dieser Erweiterung gespeicherten
+ * Daten) werden hier mit Standardwerten aufgefüllt statt roh durchgereicht - sonst würde ein alter
+ * localStorage-Stand nach einem Feature-Update `undefined` statt eines gültigen Loadouts liefern. */
 export function cosmeticsFor(
   store: Partial<Record<CharacterId, CharacterCosmetics>>,
   id: CharacterId,
 ): CharacterCosmetics {
-  return store[id] ?? emptyCosmetics(AVATAR_CONFIGS[id])
+  const empty = emptyCosmetics(AVATAR_CONFIGS[id])
+  const stored = store[id]
+  if (!stored) return empty
+  return {
+    coins: stored.coins ?? 0,
+    loadout: { ...empty.loadout, ...stored.loadout },
+    ownership: { ...empty.ownership, ...stored.ownership },
+  }
 }
 
 function addCoins(
@@ -338,6 +362,53 @@ export const useGameStore = create<GameStore>((set, get) => ({
       updated = { ...current, coins: current.coins - GLOVES_PRICE, ownership: { ...current.ownership, gloves: true } }
     }
     updated = { ...updated, loadout: { ...updated.loadout, gloves: wantGloves } }
+    const cosmetics = { ...get().cosmetics, [id]: updated }
+    saveAllCosmetics(cosmetics)
+    set({ cosmetics })
+    return true
+  },
+
+  equipOrBuyGlasses: (id, style) => {
+    const current = cosmeticsFor(get().cosmetics, id)
+    let updated = current
+    if (!isGlassesStyleOwned(current.ownership, style)) {
+      const price = glassesStylePrice(style)
+      if (current.coins < price) return false
+      updated = {
+        ...current,
+        coins: current.coins - price,
+        ownership: { ...current.ownership, glassesStyles: [...current.ownership.glassesStyles, style] },
+      }
+    }
+    updated = { ...updated, loadout: { ...updated.loadout, glassesStyle: style } }
+    const cosmetics = { ...get().cosmetics, [id]: updated }
+    saveAllCosmetics(cosmetics)
+    set({ cosmetics })
+    return true
+  },
+
+  equipOrBuyWatch: (id, wantWatch) => {
+    const current = cosmeticsFor(get().cosmetics, id)
+    let updated = current
+    if (wantWatch && !current.ownership.watch) {
+      if (current.coins < WATCH_PRICE) return false
+      updated = { ...current, coins: current.coins - WATCH_PRICE, ownership: { ...current.ownership, watch: true } }
+    }
+    updated = { ...updated, loadout: { ...updated.loadout, watch: wantWatch } }
+    const cosmetics = { ...get().cosmetics, [id]: updated }
+    saveAllCosmetics(cosmetics)
+    set({ cosmetics })
+    return true
+  },
+
+  equipOrBuyHeadband: (id, wantHeadband) => {
+    const current = cosmeticsFor(get().cosmetics, id)
+    let updated = current
+    if (wantHeadband && !current.ownership.headband) {
+      if (current.coins < HEADBAND_PRICE) return false
+      updated = { ...current, coins: current.coins - HEADBAND_PRICE, ownership: { ...current.ownership, headband: true } }
+    }
+    updated = { ...updated, loadout: { ...updated.loadout, headband: wantHeadband } }
     const cosmetics = { ...get().cosmetics, [id]: updated }
     saveAllCosmetics(cosmetics)
     set({ cosmetics })

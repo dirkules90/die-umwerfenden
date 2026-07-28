@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { cosmeticsFor, useGameStore } from '../../state/gameStore'
-import { LaneScene } from '../../scene/LaneScene'
+import { LaneScene, type ThrowMood } from '../../scene/LaneScene'
 import { AVATAR_CONFIGS } from '../../characters/avatarConfigs'
 import { currentPlayer } from '../../game/gameStateMachine'
 import { DIGIT_SLOTS, freeSlots } from '../../game/houseNumberRules'
@@ -12,9 +12,25 @@ import { AchievementBanner } from '../components/AchievementBanner'
 import { ConfettiOverlay } from '../components/ConfettiOverlay'
 import { ControlsHelp } from '../components/ControlsHelp'
 import { FullscreenButton } from '../components/FullscreenButton'
-import type { DigitSlot } from '../../game/types'
+import type { DigitSlot, GameMode } from '../../game/types'
 
 const SLOT_LABELS: Record<DigitSlot, string> = { hundert: 'Hunderter', zehn: 'Zehner', einer: 'Einer' }
+
+/** Stimmung eines Hausnummer-Wurfs (Teil: Reaktions-Mimik) - "gut" bedeutet je nach Modus etwas
+ * anderes: bei "Hoch" ist eine hohe Ziffer gut, bei "Niedrig" eine niedrige. Rinne ist unabhängig
+ * vom Modus immer ein "trauriger" Moment - auch wenn sie bei "Niedrig" zufällig die Ziffer 9 gibt,
+ * die dort eigentlich schlecht wäre, bleibt der Rinnenwurf visuell ein Fehlwurf. */
+function evaluateHausnummerMood(mode: GameMode, pinsDown: number, isGutter: boolean): ThrowMood {
+  if (isGutter) return 'sad'
+  if (mode === 'hoch') {
+    if (pinsDown >= 6) return 'happy'
+    if (pinsDown <= 2) return 'sad'
+    return 'meh'
+  }
+  if (pinsDown <= 3) return 'happy'
+  if (pinsDown >= 7) return 'sad'
+  return 'meh'
+}
 
 export function GameScreen() {
   const session = useGameStore((s) => s.session)
@@ -102,9 +118,12 @@ export function GameScreen() {
     },
     onAimUpdate: (pull, angle) => sceneRef.current?.updateAim(pull, angle),
     onRelease: (power, angle, spin) => {
-      if (!sceneRef.current) return
+      if (!sceneRef.current || !session) return
       setInFlight(true)
-      sceneRef.current.releaseThrow(power, angle, spin, handleThrowSettled)
+      const mode = session.mode
+      sceneRef.current.releaseThrow(power, angle, spin, handleThrowSettled, (pinsDown, isGutter) =>
+        evaluateHausnummerMood(mode, pinsDown, isGutter),
+      )
     },
     onCancel: () => {
       sceneRef.current?.beginAimPhase()
