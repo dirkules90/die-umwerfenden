@@ -9,6 +9,7 @@ const DAILY_KEY = 'kegeln-lembeck:daily:v1'
 const ALLTIME_KEY = 'kegeln-lembeck:alltime:v1'
 const PIN_KEY = 'kegeln-lembeck:pins:v1'
 const COSMETICS_KEY = 'kegeln-lembeck:cosmetics:v1'
+const WEEKLY_KEY = 'kegeln-lembeck:weekly:v1'
 
 /** Start-PIN jedes Charakters, bis er/sie sie einmal persönlich ändert (Teil: Charakter-PIN,
  * Vorstufe für den Kosmetik-Shop). Wie das Reset-Passwort keine echte Sicherheit, nur eine Hürde
@@ -151,4 +152,25 @@ export function loadAllCosmetics(): Partial<Record<CharacterId, CharacterCosmeti
 
 export function saveAllCosmetics(data: Partial<Record<CharacterId, CharacterCosmetics>>): void {
   localStorage.setItem(COSMETICS_KEY, JSON.stringify(data))
+}
+
+/** Wochen-Punkte-Akkumulator für den Wochensieger-Münzbonus (Teil: Coin-Shop-Wirtschaft) -
+ * unabhängig vom Tages-/Allzeit-Punktesystem der Bestenliste. weekKey ist der Montag der Woche,
+ * für die `points` gerade gesammelt werden (siehe game/dateKey.ts weekKeyFor). */
+export function loadRawWeekly(): { weekKey: string; points: Partial<Record<CharacterId, number>> } | null {
+  try {
+    const raw = localStorage.getItem(WEEKLY_KEY)
+    if (!raw) return null
+    return JSON.parse(raw) as { weekKey: string; points: Partial<Record<CharacterId, number>> }
+  } catch {
+    return null
+  }
+}
+
+export function saveWeeklyRecords(weekKey: string, points: Partial<Record<CharacterId, number>>): void {
+  localStorage.setItem(WEEKLY_KEY, JSON.stringify({ weekKey, points }))
+}
+
+export function resetWeeklyRecords(): void {
+  localStorage.removeItem(WEEKLY_KEY)
 }

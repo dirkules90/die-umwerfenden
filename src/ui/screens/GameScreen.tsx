@@ -26,6 +26,7 @@ export function GameScreen() {
   const finalResult = useGameStore((s) => s.finalResult)
   const statistics = useGameStore((s) => s.statistics)
   const cosmetics = useGameStore((s) => s.cosmetics)
+  const lastGameCoins = useGameStore((s) => s.lastGameCoins)
   const goTo = useGameStore((s) => s.goTo)
   const backToStartFromGameOver = useGameStore((s) => s.backToStartFromGameOver)
   const pauseMenuOpen = useGameStore((s) => s.pauseMenuOpen)
@@ -150,6 +151,7 @@ export function GameScreen() {
   const playerStats = statistics[player]
   const personalBest = session.mode === 'hoch' ? playerStats?.bestHigh : playerStats?.bestLow
   const groupBest = groupHighscore(statistics, session.mode)
+  const playerCoins = cosmeticsFor(cosmetics, player).coins
 
   return (
     <div className="game-root" ref={containerRef}>
@@ -159,6 +161,7 @@ export function GameScreen() {
         <div className="hud-top-left panel">
           <img className="hud-avatar" src={playerConfig.photoUrl} alt={playerConfig.name} />
           <strong>{playerConfig.name}</strong>
+          <span className="hud-coins">🪙 {playerCoins}</span>
         </div>
 
         <div className="hud-top-mid panel">Wurf {session.currentThrowIndex + 1} von 3</div>
@@ -256,6 +259,11 @@ export function GameScreen() {
               <div style={{ fontSize: '2.6rem', fontWeight: 800 }}>{String(finalResult.houseNumber).padStart(3, '0')}</div>
               {personalBest !== null && personalBest !== undefined && (
                 <div style={{ opacity: 0.8 }}>Bestwert: {String(personalBest).padStart(3, '0')}</div>
+              )}
+              {lastGameCoins !== null && (
+                <div style={{ color: '#ffd75e' }}>
+                  +{lastGameCoins} 🪙 verdient · {playerCoins} 🪙 gesamt
+                </div>
               )}
             </div>
             <div style={{ display: 'flex', gap: '0.8rem' }}>

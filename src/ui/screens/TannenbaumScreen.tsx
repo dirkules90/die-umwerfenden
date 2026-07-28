@@ -5,6 +5,7 @@ import { AVATAR_CONFIGS } from '../../characters/avatarConfigs'
 import { useDragShoot } from '../hooks/useDragShoot'
 import { useLeverDrag } from '../hooks/useLeverDrag'
 import { useSteerDrag } from '../hooks/useSteerDrag'
+import { AchievementBanner } from '../components/AchievementBanner'
 import { ConfettiOverlay } from '../components/ConfettiOverlay'
 import { ControlsHelp } from '../components/ControlsHelp'
 import { FullscreenButton } from '../components/FullscreenButton'
@@ -19,6 +20,7 @@ export function TannenbaumScreen() {
   const tannenbaumResult = useGameStore((s) => s.tannenbaumResult)
   const statistics = useGameStore((s) => s.statistics)
   const cosmetics = useGameStore((s) => s.cosmetics)
+  const lastGameCoins = useGameStore((s) => s.lastGameCoins)
   const goTo = useGameStore((s) => s.goTo)
   const backToStartFromGameOver = useGameStore((s) => s.backToStartFromGameOver)
   const pauseMenuOpen = useGameStore((s) => s.pauseMenuOpen)
@@ -135,6 +137,7 @@ export function TannenbaumScreen() {
 
   const playerConfig = AVATAR_CONFIGS[session.playerId]
   const playerStats = statistics[session.playerId]
+  const playerCoins = cosmeticsFor(cosmetics, session.playerId).coins
 
   return (
     <div className="game-root" ref={containerRef}>
@@ -144,6 +147,7 @@ export function TannenbaumScreen() {
         <div className="hud-top-left panel">
           <img className="hud-avatar" src={playerConfig.photoUrl} alt={playerConfig.name} />
           <strong>{playerConfig.name}</strong>
+          <span className="hud-coins">🪙 {playerCoins}</span>
         </div>
 
         <div className="hud-top-mid panel">Wurf {session.throwCount + 1} · Tannenbaum</div>
@@ -205,6 +209,11 @@ export function TannenbaumScreen() {
               {!tannenbaumResult.isBest && playerStats?.bestTannenbaum !== null && playerStats?.bestTannenbaum !== undefined && (
                 <div style={{ opacity: 0.8 }}>Bestwert: {playerStats.bestTannenbaum} Würfe</div>
               )}
+              {lastGameCoins !== null && (
+                <div style={{ color: '#ffd75e' }}>
+                  +{lastGameCoins} 🪙 verdient · {playerCoins} 🪙 gesamt
+                </div>
+              )}
             </div>
             <div style={{ display: 'flex', gap: '0.8rem' }}>
               <button className="btn" onClick={() => goTo('modeSelect')}>
@@ -244,6 +253,8 @@ export function TannenbaumScreen() {
             </div>
           </div>
         )}
+
+        <AchievementBanner />
       </div>
     </div>
   )

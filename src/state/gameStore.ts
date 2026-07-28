@@ -29,11 +29,12 @@ import {
   tannenbaumLeverAnimationDone,
   tannenbaumLeverPulled,
 } from '../game/tannenbaumMachine'
-import { ACHIEVEMENT_DEFS, grantAchievement, hasAchievement } from '../game/achievements'
+import { ACHIEVEMENT_DEFS, achievementCoinReward, grantAchievement, hasAchievement } from '../game/achievements'
 import { computeTotalDailyPoints, dailyWinners, emptyDailyRecord, type DailyRecords } from '../game/dailyWinner'
-import { todayKey } from '../game/dateKey'
+import { currentWeekKey, todayKey } from '../game/dateKey'
 import { AVATAR_CONFIGS } from '../characters/avatarConfigs'
 import { hairStylePrice, isHairStyleOwned, isShirtStyleOwned, shirtStylePrice, GLOVES_PRICE } from '../game/cosmetics'
+import { coinsForHausnummer, coinsForTannenbaum, WEEKLY_WINNER_COIN_BONUS } from '../game/coins'
 import {
   DEFAULT_PIN,
   emptyCosmetics,
@@ -43,16 +44,19 @@ import {
   loadAllTimeBoard,
   loadPins,
   loadRawDaily,
+  loadRawWeekly,
   loadSettings,
   resetAllStatistics,
   resetAllTimeBoard,
   resetDailyRecords,
+  resetWeeklyRecords,
   saveAllCosmetics,
   saveAllStatistics,
   saveAllTimeBoard,
   saveDailyRecords,
   savePins,
   saveSettings,
+  saveWeeklyRecords,
 } from '../storage/localStorageService'
 import { soundManager } from '../audio/soundManager'
 import { vibrate } from '../game/haptics'
@@ -80,6 +84,7 @@ interface PerGameCounters {
 interface AchievementBanner {
   playerId: CharacterId
   title: string
+  coins: number
 }
 
 interface GameStore {
@@ -100,6 +105,9 @@ interface GameStore {
   pendingAllNine: boolean
   finalResult: RoundResult | null
   tannenbaumResult: { throwCount: number; isBest: boolean } | null
+  /** Für die Anzeige "+X Münzen" auf dem Ergebnis-Bildschirm nach einer abgeschlossenen Partie
+   * (Teil: Coin-Shop-Wirtschaft) - unabhängig von Achievement-Münzen, die per Banner laufen. */
+  lastGameCoins: number | null
   pauseMenuOpen: boolean
 
   goTo: (screen: Screen) => void
@@ -144,15 +152,31 @@ export function cosmeticsFor(
   return store[id] ?? emptyCosmetics(AVATAR_CONFIGS[id])
 }
 
+function addCoins(
+  cosmeticsMap: Partial<Record<CharacterId, CharacterCosmetics>>,
+  id: CharacterId,
+  amount: number,
+): Partial<Record<CharacterId, CharacterCosmetics>> {
+  if (amount <= 0) return cosmeticsMap
+  const current = cosmeticsFor(cosmeticsMap, id)
+  return { ...cosmeticsMap, [id]: { ...current, coins: current.coins + amount } }
+}
+
 /**
- * Tagesabschluss (Teil: All-Time-Bestenliste): eine echte "um 23:59:59 ausführen"-Aktion gibt es
- * in einer rein clientseitigen PWA ohne Server nicht. Stattdessen wird beim nächsten App-Start
- * geprüft, ob die gespeicherten Tagesrekorde von einem älteren Tag stammen - falls ja, wird für
- * diesen abgelaufenen Tag einmalig der/die Tagessieger ermittelt, bekommt 1 Punkt (bei
- * Gleichstand aufgeteilt) in der All-Time-Liste gutgeschrieben, und die Tagesdaten werden für den
- * neuen Tag zurückgesetzt.
+ * Tages- und Wochenabschluss (Teil: All-Time-Bestenliste / Coin-Shop-Wirtschaft): eine echte
+ * "um 23:59:59 ausführen"-Aktion gibt es in einer rein clientseitigen PWA ohne Server nicht.
+ * Stattdessen wird beim nächsten App-Start geprüft:
+ *
+ * 1. Stammen die gespeicherten Tagesrekorde von einem älteren Tag? Falls ja, wird für diesen
+ *    abgelaufenen Tag einmalig der/die Tagessieger ermittelt, bekommt 1 Punkt (bei Gleichstand
+ *    aufgeteilt) in der All-Time-Liste gutgeschrieben (unverändert), UND die Tagespunkte fließen
+ *    zusätzlich in den Wochen-Akkumulator ein.
+ * 2. Gehört der Wochen-Akkumulator (jetzt inklusive des ggf. gerade abgeschlossenen Tages) noch
+ *    zur aktuellen Kalenderwoche? Falls nein, wird der/die Wochensieger aus den gesammelten
+ *    Wochenpunkten ermittelt und bekommt einen einmaligen Münzbonus (WEEKLY_WINNER_COIN_BONUS,
+ *    bei Gleichstand aufgeteilt) gutgeschrieben - statt eines Bonus für jeden einzelnen Tagessieg.
  */
-function loadStatisticsAndDailyState(): {
+function processDailyAndWeeklyRollover(): {
   statistics: Record<CharacterId, PlayerStatistics>
   dailyRecords: DailyRecords
   allTimeBoard: Partial<Record<CharacterId, number>>
@@ -161,24 +185,47 @@ function loadStatisticsAndDailyState(): {
   let allTimeBoard = loadAllTimeBoard()
   const raw = loadRawDaily()
 
-  if (!raw || raw.date === todayKey()) {
-    return { statistics, dailyRecords: raw?.records ?? {}, allTimeBoard }
+  const rawWeekly = loadRawWeekly()
+  let weekKey = rawWeekly?.weekKey ?? currentWeekKey()
+  let weeklyPoints = rawWeekly?.points ?? {}
+
+  let dailyRecords: DailyRecords = raw?.records ?? {}
+
+  if (raw && raw.date !== todayKey()) {
+    const staleDayTotals = computeTotalDailyPoints(raw.records, statistics, raw.date)
+    const { ids: winners } = dailyWinners(staleDayTotals)
+    if (winners.length > 0) {
+      const share = 1 / winners.length
+      const updatedBoard = { ...allTimeBoard }
+      for (const id of winners) updatedBoard[id] = (updatedBoard[id] ?? 0) + share
+      allTimeBoard = updatedBoard
+      saveAllTimeBoard(allTimeBoard)
+    }
+    for (const [id, points] of Object.entries(staleDayTotals) as [CharacterId, number][]) {
+      weeklyPoints = { ...weeklyPoints, [id]: (weeklyPoints[id] ?? 0) + points }
+    }
+    saveDailyRecords({})
+    dailyRecords = {}
   }
 
-  const staleDayTotals = computeTotalDailyPoints(raw.records, statistics, raw.date)
-  const { ids: winners } = dailyWinners(staleDayTotals)
-  if (winners.length > 0) {
-    const share = 1 / winners.length
-    const updatedBoard = { ...allTimeBoard }
-    for (const id of winners) updatedBoard[id] = (updatedBoard[id] ?? 0) + share
-    allTimeBoard = updatedBoard
-    saveAllTimeBoard(allTimeBoard)
+  if (weekKey !== currentWeekKey()) {
+    const { ids: weekWinners } = dailyWinners(weeklyPoints)
+    if (weekWinners.length > 0) {
+      const cosmetics = loadAllCosmetics()
+      const share = Math.floor(WEEKLY_WINNER_COIN_BONUS / weekWinners.length)
+      let updatedCosmetics = cosmetics
+      for (const id of weekWinners) updatedCosmetics = addCoins(updatedCosmetics, id, share)
+      saveAllCosmetics(updatedCosmetics)
+    }
+    weekKey = currentWeekKey()
+    weeklyPoints = {}
   }
-  saveDailyRecords({})
-  return { statistics, dailyRecords: {}, allTimeBoard }
+
+  saveWeeklyRecords(weekKey, weeklyPoints)
+  return { statistics, dailyRecords, allTimeBoard }
 }
 
-const initialDailyState = loadStatisticsAndDailyState()
+const initialDailyState = processDailyAndWeeklyRollover()
 
 export const useGameStore = create<GameStore>((set, get) => ({
   screen: 'start',
@@ -198,6 +245,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   pendingAllNine: false,
   finalResult: null,
   tannenbaumResult: null,
+  lastGameCoins: null,
   pauseMenuOpen: false,
 
   setPauseMenuOpen: (open) => set({ pauseMenuOpen: open }),
@@ -304,6 +352,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       screen: 'game',
       perGameCounters: { [selectedPlayer]: { gutterCount: 0, perfectStreak: 0 } },
       finalResult: null,
+      lastGameCoins: null,
     })
     soundManager.ensureContext()
     soundManager.startAmbientLoop()
@@ -316,15 +365,23 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   submitThrowResult: (pinsDown, isGutter) => {
-    const { session, perGameCounters, statistics, settings } = get()
+    const { session, perGameCounters, statistics, settings, cosmetics } = get()
     if (!session) return
     const player = currentPlayer(session)
     const { session: next, effects } = resolveThrow(session, pinsDown, isGutter)
 
     const counters = { ...(perGameCounters[player] ?? { gutterCount: 0, perfectStreak: 0 }) }
     let updatedStats = { ...statistics }
+    let updatedCosmetics = cosmetics
     let banner: AchievementBanner | null = null
     let pendingAllNine = false
+
+    function grantWithCoins(ps: PlayerStatistics, id: string, title: string): PlayerStatistics {
+      const coins = achievementCoinReward(id)
+      updatedCosmetics = addCoins(updatedCosmetics, player, coins)
+      banner = { playerId: player, title, coins }
+      return grantAchievement(ps, id)
+    }
 
     if (isGutter) {
       soundManager.playRollGutter()
@@ -347,12 +404,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
           longestPerfectStreak: Math.max(ps.longestPerfectStreak, counters.perfectStreak),
         }
         if (!hasAchievement(ps, 'volltreffer', todayKey())) {
-          ps = grantAchievement(ps, 'volltreffer')
-          banner = { playerId: player, title: 'Volltreffer' }
+          ps = grantWithCoins(ps, 'volltreffer', 'Volltreffer')
         }
         if (counters.perfectStreak >= 3 && !hasAchievement(ps, 'serientaeter', todayKey())) {
-          ps = grantAchievement(ps, 'serientaeter')
-          banner = { playerId: player, title: 'Serientäter' }
+          ps = grantWithCoins(ps, 'serientaeter', 'Serientäter')
         }
         updatedStats = { ...updatedStats, [player]: ps }
       }
@@ -360,18 +415,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
         let ps = statsFor(updatedStats, player)
         ps = { ...ps, gutterThrows: ps.gutterThrows + 1 }
         if (counters.gutterCount >= GUTTER_STREAK_FOR_ACHIEVEMENT && !hasAchievement(ps, 'bahnrand-kenner', todayKey())) {
-          ps = grantAchievement(ps, 'bahnrand-kenner')
-          banner = { playerId: player, title: 'Bahnrand-Kenner' }
+          ps = grantWithCoins(ps, 'bahnrand-kenner', 'Bahnrand-Kenner')
         }
         updatedStats = { ...updatedStats, [player]: ps }
       }
     }
 
     saveAllStatistics(updatedStats)
+    if (updatedCosmetics !== cosmetics) saveAllCosmetics(updatedCosmetics)
     set({
       session: next,
       perGameCounters: { ...perGameCounters, [player]: counters },
       statistics: updatedStats,
+      cosmetics: updatedCosmetics,
       pendingAllNine,
       achievementBanner: banner ?? get().achievementBanner,
     })
@@ -402,12 +458,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   ballReturnComplete: () => {
-    const { session, statistics, dailyRecords } = get()
+    const { session, statistics, dailyRecords, cosmetics } = get()
     if (!session) return
     const { session: next, effects } = ballReturned(session)
     let updatedStats = { ...statistics }
     let updatedDaily = dailyRecords
+    let updatedCosmetics = cosmetics
     let finalResult: RoundResult | null = null
+    let banner: AchievementBanner | null = null
+    let gameCoins: number | null = null
 
     for (const effect of effects) {
       if (effect.type === 'ROUND_COMPLETE') {
@@ -419,7 +478,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
         soundManager.playVictory()
 
         if (result) {
-          let ps = statsFor(updatedStats, result.playerId)
+          const player = result.playerId
+          function grantWithCoins(ps: PlayerStatistics, id: string, title: string): PlayerStatistics {
+            const coins = achievementCoinReward(id)
+            updatedCosmetics = addCoins(updatedCosmetics, player, coins)
+            banner = { playerId: player, title, coins }
+            return grantAchievement(ps, id)
+          }
+
+          let ps = statsFor(updatedStats, player)
           const v = result.houseNumber
           ps = { ...ps, gamesPlayed: ps.gamesPlayed + 1 }
           if (next.mode === 'hoch') {
@@ -438,28 +505,32 @@ export const useGameStore = create<GameStore>((set, get) => ({
             }
           }
 
-          const dayRec = { ...emptyDailyRecord(), ...updatedDaily[result.playerId] }
+          const dayRec = { ...emptyDailyRecord(), ...updatedDaily[player] }
           if (next.mode === 'hoch') {
             dayRec.bestHigh = dayRec.bestHigh === null ? v : Math.max(dayRec.bestHigh, v)
           } else {
             dayRec.bestLow = dayRec.bestLow === null ? v : Math.min(dayRec.bestLow, v)
           }
           dayRec.gamesPlayedToday += 1
-          updatedDaily = { ...updatedDaily, [result.playerId]: dayRec }
+          updatedDaily = { ...updatedDaily, [player]: dayRec }
           saveDailyRecords(updatedDaily)
+
+          gameCoins = coinsForHausnummer(next.mode, v)
+          updatedCosmetics = addCoins(updatedCosmetics, player, gameCoins)
 
           // Stammgast/Tiefstapler bewusst auf Tageswerten statt Lebenszeit-Rekorden: so bleiben
           // sie wie die übrigen Achievements an jedem neuen Tag wieder frisch erreichbar, statt
           // Spieler, die den Meilenstein längst irgendwann erreicht haben, dauerhaft zu bevorzugen.
           if (next.mode === 'niedrig' && dayRec.bestLow !== null && dayRec.bestLow <= 111 && !hasAchievement(ps, 'tiefstapler', todayKey())) {
-            ps = grantAchievement(ps, 'tiefstapler')
+            ps = grantWithCoins(ps, 'tiefstapler', 'Tiefstapler')
           }
           if (dayRec.gamesPlayedToday >= 5 && !hasAchievement(ps, 'stammgast', todayKey())) {
-            ps = grantAchievement(ps, 'stammgast')
+            ps = grantWithCoins(ps, 'stammgast', 'Stammgast')
           }
-          updatedStats = { ...updatedStats, [result.playerId]: ps }
+          updatedStats = { ...updatedStats, [player]: ps }
         }
         saveAllStatistics(updatedStats)
+        if (updatedCosmetics !== cosmetics) saveAllCosmetics(updatedCosmetics)
         soundManager.stopAmbientLoop()
       }
     }
@@ -468,7 +539,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
       session: next,
       statistics: updatedStats,
       dailyRecords: updatedDaily,
+      cosmetics: updatedCosmetics,
       finalResult: finalResult ?? get().finalResult,
+      lastGameCoins: gameCoins ?? get().lastGameCoins,
+      achievementBanner: banner ?? get().achievementBanner,
     })
   },
 
@@ -486,13 +560,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
       tannenbaumSession: createTannenbaumSession(selectedPlayer),
       screen: 'tannenbaum',
       tannenbaumResult: null,
+      lastGameCoins: null,
     })
     soundManager.ensureContext()
     soundManager.startAmbientLoop()
   },
 
   submitTannenbaumThrow: (pinsDown) => {
-    const { tannenbaumSession, statistics, dailyRecords } = get()
+    const { tannenbaumSession, statistics, dailyRecords, cosmetics } = get()
     if (!tannenbaumSession) return
     soundManager.playPinsFall(pinsDown)
     const { session: next, completed } = resolveTannenbaumThrow(tannenbaumSession, pinsDown)
@@ -501,6 +576,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       soundManager.playVictory()
       const player = next.playerId
       const throwCount = next.throwCount
+      let banner: AchievementBanner | null = null
+      let updatedCosmetics = cosmetics
 
       let ps = statsFor(statistics, player)
       const isBest = ps.bestTannenbaum === null || throwCount < ps.bestTannenbaum
@@ -512,18 +589,28 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const updatedDaily = { ...dailyRecords, [player]: dayRec }
       saveDailyRecords(updatedDaily)
 
+      const gameCoins = coinsForTannenbaum(throwCount)
+      updatedCosmetics = addCoins(updatedCosmetics, player, gameCoins)
+
       if (dayRec.gamesPlayedToday >= 5 && !hasAchievement(ps, 'stammgast', todayKey())) {
+        const achCoins = achievementCoinReward('stammgast')
+        updatedCosmetics = addCoins(updatedCosmetics, player, achCoins)
+        banner = { playerId: player, title: 'Stammgast', coins: achCoins }
         ps = grantAchievement(ps, 'stammgast')
       }
       const updatedStats = { ...statistics, [player]: ps }
       saveAllStatistics(updatedStats)
+      if (updatedCosmetics !== cosmetics) saveAllCosmetics(updatedCosmetics)
 
       soundManager.stopAmbientLoop()
       set({
         tannenbaumSession: next,
         statistics: updatedStats,
         dailyRecords: updatedDaily,
+        cosmetics: updatedCosmetics,
         tannenbaumResult: { throwCount, isBest },
+        lastGameCoins: gameCoins,
+        achievementBanner: banner ?? get().achievementBanner,
       })
     } else {
       set({ tannenbaumSession: next })
@@ -564,6 +651,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     resetAllStatistics()
     resetDailyRecords()
     resetAllTimeBoard()
+    resetWeeklyRecords()
     set({ statistics: {} as Record<CharacterId, PlayerStatistics>, dailyRecords: {}, allTimeBoard: {} })
   },
 
@@ -583,6 +671,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       screen: 'start',
       finalResult: null,
       tannenbaumResult: null,
+      lastGameCoins: null,
       pauseMenuOpen: false,
     })
   },

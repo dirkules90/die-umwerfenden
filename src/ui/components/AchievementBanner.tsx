@@ -16,7 +16,7 @@ export function AchievementBanner() {
 
   return (
     <div className="achievement-banner">
-      🏆 {AVATAR_CONFIGS[banner.playerId].name}: „{banner.title}” freigeschaltet!
+      🏆 {AVATAR_CONFIGS[banner.playerId].name}: „{banner.title}” freigeschaltet! (+{banner.coins} 🪙)
     </div>
   )
 }

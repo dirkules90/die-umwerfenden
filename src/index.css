@@ -259,6 +259,12 @@ h3 {
   gap: 0.5rem;
 }
 
+.hud-coins {
+  font-size: 0.75rem;
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
 .hud-avatar {
   width: 32px;
   height: 32px;
