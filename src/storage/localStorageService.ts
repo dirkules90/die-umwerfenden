@@ -6,6 +6,12 @@ const STATS_KEY = 'kegeln-lembeck:stats:v1'
 const SETTINGS_KEY = 'kegeln-lembeck:settings:v1'
 const DAILY_KEY = 'kegeln-lembeck:daily:v1'
 const ALLTIME_KEY = 'kegeln-lembeck:alltime:v1'
+const PIN_KEY = 'kegeln-lembeck:pins:v1'
+
+/** Start-PIN jedes Charakters, bis er/sie sie einmal persönlich ändert (Teil: Charakter-PIN,
+ * Vorstufe für den Kosmetik-Shop). Wie das Reset-Passwort keine echte Sicherheit, nur eine Hürde
+ * gegen "aus Versehen einen fremden Charakter spielen/dessen Coins ausgeben". */
+export const DEFAULT_PIN = '0000'
 
 export function emptyStatistics(): PlayerStatistics {
   return {
@@ -108,4 +114,19 @@ export function saveAllTimeBoard(board: Partial<Record<CharacterId, number>>): v
 
 export function resetAllTimeBoard(): void {
   localStorage.removeItem(ALLTIME_KEY)
+}
+
+/** Fehlende Einträge bedeuten "noch nie geändert" - Aufrufer fällt dann auf DEFAULT_PIN zurück. */
+export function loadPins(): Partial<Record<CharacterId, string>> {
+  try {
+    const raw = localStorage.getItem(PIN_KEY)
+    if (!raw) return {}
+    return JSON.parse(raw)
+  } catch {
+    return {}
+  }
+}
+
+export function savePins(pins: Partial<Record<CharacterId, string>>): void {
+  localStorage.setItem(PIN_KEY, JSON.stringify(pins))
 }

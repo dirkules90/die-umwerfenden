@@ -1,10 +1,13 @@
+import { useState } from 'react'
 import { useGameStore } from '../../state/gameStore'
 import { AVATAR_CONFIGS, CHARACTER_ORDER } from '../../characters/avatarConfigs'
+import { PinGate } from '../components/PinGate'
 
 export function PlayerSelectScreen() {
   const selectedPlayer = useGameStore((s) => s.selectedPlayer)
   const selectPlayer = useGameStore((s) => s.selectPlayer)
   const goTo = useGameStore((s) => s.goTo)
+  const [pinGateOpen, setPinGateOpen] = useState(false)
 
   return (
     <div className="screen">
@@ -29,9 +32,21 @@ export function PlayerSelectScreen() {
           )
         })}
       </div>
-      <button className="btn" disabled={!selectedPlayer} onClick={() => goTo('modeSelect')}>
+      <button className="btn" disabled={!selectedPlayer} onClick={() => setPinGateOpen(true)}>
         Los geht&apos;s
       </button>
+
+      {pinGateOpen && selectedPlayer && (
+        <PinGate
+          characterId={selectedPlayer}
+          characterName={AVATAR_CONFIGS[selectedPlayer].name}
+          onSuccess={() => {
+            setPinGateOpen(false)
+            goTo('modeSelect')
+          }}
+          onCancel={() => setPinGateOpen(false)}
+        />
+      )}
     </div>
   )
 }

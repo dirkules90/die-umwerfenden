@@ -30,9 +30,11 @@ import { ACHIEVEMENT_DEFS, grantAchievement, hasAchievement } from '../game/achi
 import { computeTotalDailyPoints, dailyWinners, emptyDailyRecord, type DailyRecords } from '../game/dailyWinner'
 import { todayKey } from '../game/dateKey'
 import {
+  DEFAULT_PIN,
   emptyStatistics,
   loadAllStatistics,
   loadAllTimeBoard,
+  loadPins,
   loadRawDaily,
   loadSettings,
   resetAllStatistics,
@@ -41,6 +43,7 @@ import {
   saveAllStatistics,
   saveAllTimeBoard,
   saveDailyRecords,
+  savePins,
   saveSettings,
 } from '../storage/localStorageService'
 import { soundManager } from '../audio/soundManager'
@@ -78,6 +81,7 @@ interface GameStore {
   statistics: Record<CharacterId, PlayerStatistics>
   dailyRecords: DailyRecords
   allTimeBoard: Partial<Record<CharacterId, number>>
+  pins: Partial<Record<CharacterId, string>>
   settings: Settings
   achievementBanner: AchievementBanner | null
   perGameCounters: Partial<Record<CharacterId, PerGameCounters>>
@@ -90,6 +94,8 @@ interface GameStore {
   setPauseMenuOpen: (open: boolean) => void
   openSettings: (from: Screen) => void
   selectPlayer: (id: CharacterId) => void
+  verifyPin: (id: CharacterId, pin: string) => boolean
+  changePin: (id: CharacterId, oldPin: string, newPin: string) => boolean
   startGame: (mode: GameMode) => void
   beginAiming: () => void
   submitThrowResult: (pinsDown: number, isGutter: boolean) => void
@@ -159,6 +165,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   statistics: initialDailyState.statistics,
   dailyRecords: initialDailyState.dailyRecords,
   allTimeBoard: initialDailyState.allTimeBoard,
+  pins: loadPins(),
   settings: loadSettings(),
   achievementBanner: null,
   perGameCounters: {},
@@ -182,6 +189,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
   selectPlayer: (id) => {
     soundManager.playButtonClick()
     set({ selectedPlayer: id })
+  },
+
+  verifyPin: (id, pin) => {
+    const stored = get().pins[id] ?? DEFAULT_PIN
+    return stored === pin
+  },
+
+  changePin: (id, oldPin, newPin) => {
+    const stored = get().pins[id] ?? DEFAULT_PIN
+    if (stored !== oldPin) return false
+    const pins = { ...get().pins, [id]: newPin }
+    savePins(pins)
+    set({ pins })
+    return true
   },
 
   startGame: (mode) => {
