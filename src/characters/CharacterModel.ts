@@ -11,7 +11,8 @@ const BUILD_SCALE: Record<AvatarConfig['build'], number> = {
 
 const ARM_LENGTH = 0.34
 const SHOULDER_Y = 0.97
-const SHOULDER_X = 0.27
+const SHOULDER_X = 0.205
+const ARM_REST_LEAN = 0.16
 
 // Gecachte Textur für das "Die Umwerfenden"-Shirt-Badge (Teil: Kosmetik-Shop) - dieselbe Textur
 // wird bei jedem Charakterwechsel und jeder Shop-Vorschau neu gebraucht, ein wiederholter
@@ -97,6 +98,15 @@ export class CharacterModel {
       this.group.add(shoe)
     }
 
+    // Hüfte: schließt die sonst sichtbare Lücke zwischen den beiden einzelnen Bein-Kapseln und
+    // der spitz zulaufenden Torso-Unterseite - ohne dieses Stück "schweben" Beine und Torso
+    // sichtbar getrennt voneinander statt wie ein zusammenhängender Körper zu wirken.
+    const hip = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.15, 4, 8), pantsMat)
+    hip.rotation.z = Math.PI / 2
+    hip.position.y = 0.55
+    hip.castShadow = true
+    this.group.add(hip)
+
     // Torso (Hüfte 0.58 bis Schulterbereich ~1.02)
     const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.19, 0.08, 4, 10), shirtMat)
     torso.position.y = 0.8
@@ -143,7 +153,7 @@ export class CharacterModel {
         pivot.add(glove)
       }
 
-      pivot.rotation.z = sign * 0.08
+      pivot.rotation.z = sign * ARM_REST_LEAN
       this.group.add(pivot)
     }
 
@@ -154,15 +164,19 @@ export class CharacterModel {
 
     this.buildHair(hairMat, headRadius, cosmetics.hairStyle)
 
-    // Augen - ohne diese wirkt der Kopf ausdruckslos/leer.
+    // Augen - ohne diese wirkt der Kopf ausdruckslos/leer. Pupille sitzt bewusst deutlich vor dem
+    // Weiß statt knapp darin eingebettet zu sein: vorher lag sie fast komplett innerhalb der
+    // weißen Kugel und blitzte nur als dünner, ringartiger Rand hervor statt als klarer Punkt.
     const eyeWhiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 })
     const pupilMat = new THREE.MeshStandardMaterial({ color: 0x241f1a, roughness: 0.3 })
+    const eyeWhiteRadius = 0.032
+    const eyeZ = headRadius * 0.9
     for (const side of [-1, 1]) {
-      const eyeWhite = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), eyeWhiteMat)
-      eyeWhite.position.set(side * 0.075, 0.01, headRadius * 0.92)
+      const eyeWhite = new THREE.Mesh(new THREE.SphereGeometry(eyeWhiteRadius, 12, 10), eyeWhiteMat)
+      eyeWhite.position.set(side * 0.075, 0.01, eyeZ)
       this.headGroup.add(eyeWhite)
-      const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.017, 8, 8), pupilMat)
-      pupil.position.set(side * 0.075, 0.01, headRadius * 0.97)
+      const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.017, 10, 8), pupilMat)
+      pupil.position.set(side * 0.075, 0.01, eyeZ + eyeWhiteRadius - 0.006)
       this.headGroup.add(pupil)
     }
 
@@ -173,8 +187,11 @@ export class CharacterModel {
     this.headGroup.add(mouth)
 
     if (config.hasBeard) {
+      // thetaStart vorher bei 0.45π: die Bart-Oberkante lag dadurch auf Höhe des Munds statt
+      // darunter, sah aus wie ein Bart, der durch den Mund reicht. 0.55π beginnt spürbar unter
+      // der Mundhöhe (y=-0.075).
       const beard = new THREE.Mesh(
-        new THREE.SphereGeometry(headRadius * 0.7, 12, 10, 0, Math.PI * 2, Math.PI * 0.45, Math.PI * 0.4),
+        new THREE.SphereGeometry(headRadius * 0.78, 12, 10, 0, Math.PI * 2, Math.PI * 0.55, Math.PI * 0.32),
         hairMat,
       )
       beard.position.set(0, -0.09, 0.04)
@@ -203,8 +220,10 @@ export class CharacterModel {
   private buildHair(hairMat: THREE.Material, headRadius: number, style: HairStyleId) {
     switch (style) {
       case 'kurz': {
+        // Radius nur minimal größer als der Kopf (statt sichtbar größer): sonst "schwebt" die
+        // Frisur als eigene Kugelschale über der Kopfkugel statt bündig damit abzuschließen.
         const hair = new THREE.Mesh(
-          new THREE.SphereGeometry(headRadius * 1.08, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.42),
+          new THREE.SphereGeometry(headRadius * 1.015, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.34),
           hairMat,
         )
         hair.position.y = 0.05
@@ -213,7 +232,7 @@ export class CharacterModel {
       }
       case 'lang': {
         const cap = new THREE.Mesh(
-          new THREE.SphereGeometry(headRadius * 1.05, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.62),
+          new THREE.SphereGeometry(headRadius * 1.015, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.54),
           hairMat,
         )
         cap.position.y = 0.015
@@ -237,8 +256,10 @@ export class CharacterModel {
       }
       case 'standard':
       default: {
+        // Vorher bis 0.62π: reichte damit sichtbar bis unter die Augen. 0.46π endet knapp über
+        // der Augenbrauen-Linie.
         const hair = new THREE.Mesh(
-          new THREE.SphereGeometry(headRadius * 1.05, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.62),
+          new THREE.SphereGeometry(headRadius * 1.015, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.46),
           hairMat,
         )
         hair.position.y = 0.015
@@ -254,7 +275,7 @@ export class CharacterModel {
     if (style === 'standard') return
     const texture = style === 'umwerfenden' ? getUmwerfendenBadgeTexture() : buildBlitzBadgeTexture()
     const badgeMat = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.8, transparent: true })
-    const badge = new THREE.Mesh(new THREE.CircleGeometry(0.085, 20), badgeMat)
+    const badge = new THREE.Mesh(new THREE.CircleGeometry(0.115, 20), badgeMat)
     badge.position.set(0, 0.86, 0.185)
     this.torsoGroup.add(badge)
   }
@@ -314,8 +335,8 @@ export class CharacterModel {
     this.group.position.y = 0
     this.headGroup.rotation.set(0, 0, 0)
     this.torsoGroup.rotation.set(0, 0, 0)
-    this.leftArmPivot.rotation.set(0, 0, -0.08)
-    this.rightArmPivot.rotation.set(0, 0, 0.08)
+    this.leftArmPivot.rotation.set(0, 0, -ARM_REST_LEAN)
+    this.rightArmPivot.rotation.set(0, 0, ARM_REST_LEAN)
     this.setAnimState('idle')
   }
 }

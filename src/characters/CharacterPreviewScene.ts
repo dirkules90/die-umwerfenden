@@ -2,8 +2,12 @@ import * as THREE from 'three'
 import { CharacterModel } from './CharacterModel'
 import type { AvatarConfig, CosmeticLoadout } from '../game/types'
 
+const INITIAL_ROTATION_Y = Math.PI * 0.12
+const DRAG_SENSITIVITY = 0.012
+
 /** Leichtgewichtige Vorschau für den Kosmetik-Shop: nur Charaktermodell + Licht, ganz ohne Bahn,
- * Physik oder Kegel - im Gegensatz zu LaneScene, die dafür deutlich zu schwer wäre. */
+ * Physik oder Kegel - im Gegensatz zu LaneScene, die dafür deutlich zu schwer wäre. Per Touch/Maus
+ * horizontal drehbar, damit man die Ausrüstung von allen Seiten begutachten kann. */
 export class CharacterPreviewScene {
   private renderer: THREE.WebGLRenderer
   private scene = new THREE.Scene()
@@ -11,8 +15,31 @@ export class CharacterPreviewScene {
   private clock = new THREE.Clock()
   private model: CharacterModel | null = null
   private disposed = false
+  private rotationY = INITIAL_ROTATION_Y
+  private dragging = false
+  private lastPointerX = 0
+  private canvas: HTMLCanvasElement
+
+  private onPointerDown = (e: PointerEvent) => {
+    this.dragging = true
+    this.lastPointerX = e.clientX
+    this.canvas.setPointerCapture(e.pointerId)
+  }
+
+  private onPointerMove = (e: PointerEvent) => {
+    if (!this.dragging) return
+    const dx = e.clientX - this.lastPointerX
+    this.lastPointerX = e.clientX
+    this.rotationY += dx * DRAG_SENSITIVITY
+    if (this.model) this.model.group.rotation.y = this.rotationY
+  }
+
+  private onPointerUp = () => {
+    this.dragging = false
+  }
 
   constructor(canvas: HTMLCanvasElement) {
+    this.canvas = canvas
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 
@@ -28,13 +55,20 @@ export class CharacterPreviewScene {
     const fill = new THREE.AmbientLight(0xffffff, 0.35)
     this.scene.add(fill)
 
+    canvas.style.touchAction = 'none'
+    canvas.addEventListener('pointerdown', this.onPointerDown)
+    canvas.addEventListener('pointermove', this.onPointerMove)
+    canvas.addEventListener('pointerup', this.onPointerUp)
+    canvas.addEventListener('pointercancel', this.onPointerUp)
+    canvas.addEventListener('pointerleave', this.onPointerUp)
+
     this.renderer.setAnimationLoop(() => this.tick())
   }
 
   setCharacter(config: AvatarConfig, cosmetics: CosmeticLoadout) {
     if (this.model) this.scene.remove(this.model.group)
     this.model = new CharacterModel(config, cosmetics)
-    this.model.group.rotation.y = Math.PI * 0.12
+    this.model.group.rotation.y = this.rotationY
     this.scene.add(this.model.group)
   }
 
@@ -54,6 +88,11 @@ export class CharacterPreviewScene {
   dispose() {
     this.disposed = true
     this.renderer.setAnimationLoop(null)
+    this.canvas.removeEventListener('pointerdown', this.onPointerDown)
+    this.canvas.removeEventListener('pointermove', this.onPointerMove)
+    this.canvas.removeEventListener('pointerup', this.onPointerUp)
+    this.canvas.removeEventListener('pointercancel', this.onPointerUp)
+    this.canvas.removeEventListener('pointerleave', this.onPointerUp)
     this.renderer.dispose()
   }
 }
