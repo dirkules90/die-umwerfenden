@@ -265,6 +265,23 @@ h3 {
   white-space: nowrap;
 }
 
+/* Stimmungs-Badge neben dem Wurfergebnis (Teil: Reaktions-Mimik) - bleibt so lange sichtbar wie das
+   Ergebnis-Panel selbst, im Gegensatz zur kurzen 3D-Kamera-Reaktion, die leicht zu verpassen ist. */
+.mood-face {
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 50%;
+  border: 3px solid var(--panel-border);
+  background: var(--panel-bg);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.result-with-mood {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
 .hud-avatar {
   width: 32px;
   height: 32px;

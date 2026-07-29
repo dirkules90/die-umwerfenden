@@ -12,6 +12,8 @@ import { AchievementBanner } from '../components/AchievementBanner'
 import { ConfettiOverlay } from '../components/ConfettiOverlay'
 import { ControlsHelp } from '../components/ControlsHelp'
 import { FullscreenButton } from '../components/FullscreenButton'
+import { MoodFace } from '../components/MoodFace'
+import type { Mood } from '../../characters/faceArt'
 import type { DigitSlot, GameMode } from '../../game/types'
 
 const SLOT_LABELS: Record<DigitSlot, string> = { hundert: 'Hunderter', zehn: 'Zehner', einer: 'Einer' }
@@ -56,6 +58,10 @@ export function GameScreen() {
   const [inFlight, setInFlight] = useState(false)
   const [leverProgress, setLeverProgress] = useState(0)
   const leverPhaseTriggered = useRef(false)
+  // Stimmung des letzten Wurfs als React-State statt nur als 3D-Animation (Teil: Reaktions-Mimik) -
+  // die kurze Kamera-Reaktion in der Szene ist leicht zu verpassen, dieses Badge bleibt neben dem
+  // Ergebnis so lange sichtbar wie das Panel selbst.
+  const [lastMood, setLastMood] = useState<Mood>('neutral')
 
   // Szenen-Lebenszyklus, entkoppelt vom React-Renderzyklus (Teil 17.2).
   useEffect(() => {
@@ -102,11 +108,17 @@ export function GameScreen() {
   }, [])
 
   const handleThrowSettled = useCallback(
-    (result: { pinsDown: number; isGutter: boolean }) => {
+    (result: { pinsDown: number; isGutter: boolean; wasAllNine: boolean }) => {
       setInFlight(false)
+      if (session) {
+        const mood: Mood = result.wasAllNine
+          ? 'happy'
+          : evaluateHausnummerMood(session.mode, result.pinsDown, result.isGutter)
+        setLastMood(mood)
+      }
       submitThrowResult(result.pinsDown, result.isGutter)
     },
-    [submitThrowResult],
+    [submitThrowResult, session],
   )
 
   const dragShoot = useDragShoot({
@@ -236,9 +248,12 @@ export function GameScreen() {
 
         {session.phase === 'digitChoice' && session.pendingDigit !== null && (
           <div className="digit-choice-overlay">
-            <div className="panel">
-              <p>Geworfene Ziffer</p>
-              <div style={{ fontSize: '3rem', fontWeight: 800 }}>{session.pendingDigit}</div>
+            <div className="result-with-mood">
+              <MoodFace mood={lastMood} skinColor={playerConfig.skinColor} />
+              <div className="panel">
+                <p>Geworfene Ziffer</p>
+                <div style={{ fontSize: '3rem', fontWeight: 800 }}>{session.pendingDigit}</div>
+              </div>
             </div>
             <div className="digit-slots">
               {DIGIT_SLOTS.map((slot) => (
@@ -274,16 +289,19 @@ export function GameScreen() {
           <div className="game-over-overlay">
             <ConfettiOverlay />
             <h2>Deine Hausnummer</h2>
-            <div className="panel" style={{ minWidth: '14rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <div style={{ fontSize: '2.6rem', fontWeight: 800 }}>{String(finalResult.houseNumber).padStart(3, '0')}</div>
-              {personalBest !== null && personalBest !== undefined && (
-                <div style={{ opacity: 0.8 }}>Bestwert: {String(personalBest).padStart(3, '0')}</div>
-              )}
-              {lastGameCoins !== null && (
-                <div style={{ color: '#ffd75e' }}>
-                  +{lastGameCoins} 🪙 verdient · {playerCoins} 🪙 gesamt
-                </div>
-              )}
+            <div className="result-with-mood">
+              <MoodFace mood={lastMood} skinColor={playerConfig.skinColor} />
+              <div className="panel" style={{ minWidth: '14rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ fontSize: '2.6rem', fontWeight: 800 }}>{String(finalResult.houseNumber).padStart(3, '0')}</div>
+                {personalBest !== null && personalBest !== undefined && (
+                  <div style={{ opacity: 0.8 }}>Bestwert: {String(personalBest).padStart(3, '0')}</div>
+                )}
+                {lastGameCoins !== null && (
+                  <div style={{ color: '#ffd75e' }}>
+                    +{lastGameCoins} 🪙 verdient · {playerCoins} 🪙 gesamt
+                  </div>
+                )}
+              </div>
             </div>
             <div style={{ display: 'flex', gap: '0.8rem' }}>
               <button className="btn" onClick={() => goTo('modeSelect')}>

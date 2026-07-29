@@ -9,7 +9,9 @@ import { AchievementBanner } from '../components/AchievementBanner'
 import { ConfettiOverlay } from '../components/ConfettiOverlay'
 import { ControlsHelp } from '../components/ControlsHelp'
 import { FullscreenButton } from '../components/FullscreenButton'
+import { MoodFace } from '../components/MoodFace'
 import { TannenbaumTree } from '../components/TannenbaumTree'
+import type { Mood } from '../../characters/faceArt'
 
 /** Beim Tannenbaum gibt es bewusst nur Freude oder Trauer, kein "naja" (Teil: Reaktions-Mimik) -
  * ein Wurf trifft entweder eine noch offene Zahl oder verpufft wirkungslos, ein Mittelding gibt es
@@ -41,6 +43,7 @@ export function TannenbaumScreen() {
   const [inFlight, setInFlight] = useState(false)
   const [leverProgress, setLeverProgress] = useState(0)
   const leverPhaseTriggered = useRef(false)
+  const [lastMood, setLastMood] = useState<Mood>('neutral')
 
   useEffect(() => {
     if (!canvasRef.current || !session) return
@@ -86,9 +89,10 @@ export function TannenbaumScreen() {
   const handleThrowSettled = useCallback(
     (result: { pinsDown: number; isGutter: boolean }) => {
       setInFlight(false)
+      if (session) setLastMood(evaluateTannenbaumMood(session.remaining, result.pinsDown))
       submitTannenbaumThrow(result.pinsDown)
     },
-    [submitTannenbaumThrow],
+    [submitTannenbaumThrow, session],
   )
 
   const dragShoot = useDragShoot({
@@ -213,17 +217,20 @@ export function TannenbaumScreen() {
           <div className="game-over-overlay">
             <ConfettiOverlay />
             <h2>Tannenbaum geschafft!</h2>
-            <div className="panel" style={{ minWidth: '14rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <div style={{ fontSize: '2.6rem', fontWeight: 800 }}>{tannenbaumResult.throwCount} Würfe</div>
-              {tannenbaumResult.isBest && <div style={{ opacity: 0.9 }}>Neuer Bestwert!</div>}
-              {!tannenbaumResult.isBest && playerStats?.bestTannenbaum !== null && playerStats?.bestTannenbaum !== undefined && (
-                <div style={{ opacity: 0.8 }}>Bestwert: {playerStats.bestTannenbaum} Würfe</div>
-              )}
-              {lastGameCoins !== null && (
-                <div style={{ color: '#ffd75e' }}>
-                  +{lastGameCoins} 🪙 verdient · {playerCoins} 🪙 gesamt
-                </div>
-              )}
+            <div className="result-with-mood">
+              <MoodFace mood={lastMood} skinColor={playerConfig.skinColor} />
+              <div className="panel" style={{ minWidth: '14rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ fontSize: '2.6rem', fontWeight: 800 }}>{tannenbaumResult.throwCount} Würfe</div>
+                {tannenbaumResult.isBest && <div style={{ opacity: 0.9 }}>Neuer Bestwert!</div>}
+                {!tannenbaumResult.isBest && playerStats?.bestTannenbaum !== null && playerStats?.bestTannenbaum !== undefined && (
+                  <div style={{ opacity: 0.8 }}>Bestwert: {playerStats.bestTannenbaum} Würfe</div>
+                )}
+                {lastGameCoins !== null && (
+                  <div style={{ color: '#ffd75e' }}>
+                    +{lastGameCoins} 🪙 verdient · {playerCoins} 🪙 gesamt
+                  </div>
+                )}
+              </div>
             </div>
             <div style={{ display: 'flex', gap: '0.8rem' }}>
               <button className="btn" onClick={() => goTo('modeSelect')}>

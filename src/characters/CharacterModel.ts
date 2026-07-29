@@ -1,9 +1,8 @@
 import * as THREE from 'three'
 import type { AvatarConfig, CosmeticLoadout, GlassesStyleId, HairStyleId, ShirtStyleId } from '../game/types'
+import { drawFace, type Mood } from './faceArt'
 
 export type CharacterAnimState = 'idle' | 'backswing' | 'throw' | 'cheer' | 'meh' | 'disappointed'
-
-type Mood = 'neutral' | 'happy' | 'meh' | 'sad'
 
 const STATE_MOOD: Record<CharacterAnimState, Mood> = {
   idle: 'neutral',
@@ -16,10 +15,10 @@ const STATE_MOOD: Record<CharacterAnimState, Mood> = {
 
 /**
  * Bemaltes Mii-artiges Gesicht statt einzelner 3D-Geometrie für Augen/Mund (Teil: Charaktermodell-
- * Überarbeitung, Vorbild Wii-Bowling-Mii) - ein Canvas-Portrait pro Stimmung wird auf einen kleinen,
- * gewölbten Kugelausschnitt direkt vor dem Kopf projiziert. Der Hintergrund entspricht exakt der
- * Hautfarbe des Charakters, damit der Rand des Ausschnitts unsichtbar mit der Kopfkugel verschmilzt,
- * statt wie ein aufgeklebter Sticker mit sichtbarer Kante zu wirken.
+ * Überarbeitung, Vorbild Wii-Bowling-Mii) - ein Canvas-Portrait pro Stimmung (siehe faceArt.ts) wird
+ * auf einen kleinen, gewölbten Kugelausschnitt direkt vor dem Kopf projiziert. Der Hintergrund
+ * entspricht exakt der Hautfarbe des Charakters, damit der Rand des Ausschnitts unsichtbar mit der
+ * Kopfkugel verschmilzt, statt wie ein aufgeklebter Sticker mit sichtbarer Kante zu wirken.
  */
 function buildFaceTexture(mood: Mood, skinColor: string): THREE.CanvasTexture {
   const W = 256
@@ -28,104 +27,22 @@ function buildFaceTexture(mood: Mood, skinColor: string): THREE.CanvasTexture {
   canvas.width = W
   canvas.height = H
   const ctx = canvas.getContext('2d')!
-  ctx.fillStyle = skinColor
-  ctx.fillRect(0, 0, W, H)
-
-  const cx = W / 2
-  const eyeY = 96
-  const eyeDX = 52
-  const leftX = cx - eyeDX
-  const rightX = cx + eyeDX
-  const ink = '#241f1a'
-
-  // Augenbrauen - Position/Neigung transportiert die Stimmung mindestens so stark wie die Augen.
-  ctx.fillStyle = ink
-  for (const side of [-1, 1]) {
-    const bx = cx + side * eyeDX
-    ctx.save()
-    ctx.translate(bx, eyeY - 40)
-    if (mood === 'sad') ctx.rotate(side * -0.32)
-    else if (mood === 'happy') ctx.rotate(side * 0.12)
-    else if (mood === 'meh') ctx.rotate(side * 0.22 * -1)
-    ctx.fillRect(-26, -5, 52, 10)
-    ctx.restore()
-  }
-
-  if (mood === 'happy') {
-    // Fröhlich zugekniffene Augen (^‿^) statt offener Augäpfel.
-    ctx.strokeStyle = ink
-    ctx.lineWidth = 9
-    ctx.lineCap = 'round'
-    for (const x of [leftX, rightX]) {
-      ctx.beginPath()
-      ctx.arc(x, eyeY + 14, 22, Math.PI, Math.PI * 2)
-      ctx.stroke()
-    }
-  } else {
-    for (const x of [leftX, rightX]) {
-      const squint = mood === 'sad' ? 0.8 : 1
-      ctx.fillStyle = '#ffffff'
-      ctx.strokeStyle = ink
-      ctx.lineWidth = 4
-      ctx.beginPath()
-      ctx.ellipse(x, eyeY, 25, 28 * squint, 0, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.stroke()
-      ctx.fillStyle = ink
-      ctx.beginPath()
-      ctx.arc(x, eyeY + (mood === 'sad' ? 6 : 3), 11, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.fillStyle = '#ffffff'
-      ctx.beginPath()
-      ctx.arc(x - 4, eyeY - 3, 4, 0, Math.PI * 2)
-      ctx.fill()
-    }
-  }
-
-  if (mood === 'sad') {
-    // Träne unter dem rechten Auge - klar erkennbares "schlechter Wurf"-Signal auch aus der Distanz.
-    ctx.fillStyle = '#6fc3ff'
-    ctx.beginPath()
-    ctx.moveTo(rightX + 18, eyeY + 22)
-    ctx.quadraticCurveTo(rightX + 28, eyeY + 44, rightX + 18, eyeY + 54)
-    ctx.quadraticCurveTo(rightX + 8, eyeY + 44, rightX + 18, eyeY + 22)
-    ctx.fill()
-  }
-
-  // Mund: fröhlicher Bogen, gerade Linie oder trauriger Bogen.
-  ctx.strokeStyle = ink
-  ctx.fillStyle = ink
-  ctx.lineWidth = 8
-  ctx.lineCap = 'round'
-  const mouthY = 158
-  if (mood === 'happy') {
-    ctx.beginPath()
-    ctx.arc(cx, mouthY - 14, 34, Math.PI * 0.12, Math.PI * 0.88)
-    ctx.fill()
-  } else if (mood === 'sad') {
-    ctx.beginPath()
-    ctx.arc(cx, mouthY + 26, 30, Math.PI * 1.2, Math.PI * 1.8)
-    ctx.stroke()
-  } else if (mood === 'meh') {
-    ctx.save()
-    ctx.translate(cx, mouthY)
-    ctx.rotate(0.08)
-    ctx.beginPath()
-    ctx.moveTo(-26, 0)
-    ctx.lineTo(26, 0)
-    ctx.stroke()
-    ctx.restore()
-  } else {
-    ctx.beginPath()
-    ctx.moveTo(cx - 24, mouthY)
-    ctx.quadraticCurveTo(cx, mouthY + 10, cx + 24, mouthY)
-    ctx.stroke()
-  }
+  drawFace(ctx, mood, skinColor, W, H)
 
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace
   return texture
 }
+
+/** Ein Frisuren-"Kappe" (Kugelausschnitt um den Pol) muss KONZENTRISCH zur Kopfkugel bleiben, um
+ * überall flächig aufzuliegen - eine leicht größere capScale (statt 1.0) erzeugt dabei bereits einen
+ * gleichmäßigen, kaum sichtbaren Abstand zur Kopfhaut. Ein zusätzlicher y-Versatz verschiebt die
+ * Kappe dagegen NICHT entlang der Kopfkrümmung, sondern schiebt die ganze starre Kugelschale
+ * geradlinig nach oben/unten - dadurch verliert sie an Rand und Pol gleichermaßen den Bezug zur
+ * Kopfoberfläche (Bugfix: Kurzhaarschnitt schwebte sichtbar über dem Kopf, weil der alte, per Hand
+ * geschätzte Versatz genau das tat). Ein kleiner konstanter Versatz reicht nur zum Einbetten gegen
+ * Z-Fighting am Ansatz, mehr nicht. */
+const HAIR_CAP_EMBED_Y = -0.004
 
 const BUILD_SCALE: Record<AvatarConfig['build'], number> = {
   schlank: 0.92,
@@ -348,9 +265,20 @@ export class CharacterModel {
     if (config.hasBeard) {
       // thetaStart vorher bei 0.45π: die Bart-Oberkante lag dadurch auf Höhe des Munds statt
       // darunter, sah aus wie ein Bart, der durch den Mund reicht. 0.55π beginnt spürbar unter
-      // der Mundhöhe.
+      // der Mundhöhe. phiLength war vorher 2π (kompletter Ring um den ganzen Kopf) statt nur die
+      // Vorderseite - sah dadurch wie eine durchgehende Balaclava/Kragen statt eines Bartes aus
+      // (Bugfix: "Bart sitzt nicht richtig"). Jetzt nur noch ein vorderer Bogen über Kinn/Wangen.
+      const beardPhiWidth = 2.3
       const beard = new THREE.Mesh(
-        new THREE.SphereGeometry(headRadius * 0.78, 12, 10, 0, Math.PI * 2, Math.PI * 0.55, Math.PI * 0.32),
+        new THREE.SphereGeometry(
+          headRadius * 0.78,
+          12,
+          10,
+          Math.PI / 2 - beardPhiWidth / 2,
+          beardPhiWidth,
+          Math.PI * 0.55,
+          Math.PI * 0.32,
+        ),
         hairMat,
       )
       beard.position.set(0, -0.09, 0.04)
@@ -420,12 +348,13 @@ export class CharacterModel {
     switch (style) {
       case 'kurz': {
         // Radius nur minimal größer als der Kopf (statt sichtbar größer): sonst "schwebt" die
-        // Frisur als eigene Kugelschale über der Kopfkugel statt bündig damit abzuschließen.
+        // Frisur als eigene Kugelschale über der Kopfkugel statt bündig damit abzuschließen -
+        // konzentrisch zur Kopfkugel (siehe HAIR_CAP_EMBED_Y), nicht per y-Versatz verschoben.
         const hair = new THREE.Mesh(
           new THREE.SphereGeometry(headRadius * 1.015, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.34),
           hairMat,
         )
-        hair.position.y = 0.05
+        hair.position.y = HAIR_CAP_EMBED_Y
         parent.add(hair)
         break
       }
@@ -436,7 +365,7 @@ export class CharacterModel {
           new THREE.SphereGeometry(headRadius * 1.015, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.42),
           hairMat,
         )
-        cap.position.y = 0.015
+        cap.position.y = HAIR_CAP_EMBED_Y
         parent.add(cap)
         const back = new THREE.Mesh(new THREE.CapsuleGeometry(headRadius * 0.55, headRadius * 1.1, 4, 8), hairMat)
         back.position.set(0, -headRadius * 0.55, -headRadius * 0.55)
@@ -472,7 +401,7 @@ export class CharacterModel {
           new THREE.SphereGeometry(headRadius * 1.015, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.46),
           hairMat,
         )
-        hair.position.y = 0.015
+        hair.position.y = HAIR_CAP_EMBED_Y
         parent.add(hair)
         break
       }
