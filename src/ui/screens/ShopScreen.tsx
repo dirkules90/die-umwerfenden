@@ -3,20 +3,53 @@ import { cosmeticsFor, useGameStore } from '../../state/gameStore'
 import { AVATAR_CONFIGS, CHARACTER_ORDER } from '../../characters/avatarConfigs'
 import { CharacterPreviewScene } from '../../characters/CharacterPreviewScene'
 import {
+  BEARD_STYLES,
+  CAP_STYLES,
+  CAPES,
   GLASSES_STYLES,
   GLOVES_PRICE,
   HAIRSTYLES,
   HEADBAND_PRICE,
+  NECKLACES,
+  PANTS_COLORS,
   SHIRTS,
+  SHOE_COLORS,
   WATCH_PRICE,
+  WRISTBANDS,
+  beardStylePrice,
+  capePrice,
+  capStylePrice,
   glassesStylePrice,
   hairStylePrice,
+  isBeardStyleOwned,
+  isCapeOwned,
+  isCapStyleOwned,
   isGlassesStyleOwned,
   isHairStyleOwned,
+  isNecklaceOwned,
+  isPantsColorOwned,
   isShirtStyleOwned,
+  isShoeColorOwned,
+  isWristbandOwned,
+  necklacePrice,
+  pantsColorPrice,
   shirtStylePrice,
+  shoeColorPrice,
+  wristbandPrice,
 } from '../../game/cosmetics'
-import type { CosmeticLoadout, GlassesStyleId, HairStyleId, ShirtStyleId } from '../../game/types'
+import type {
+  BeardStyleId,
+  CapeId,
+  CapStyleId,
+  CosmeticLoadout,
+  GlassesStyleId,
+  HairStyleId,
+  NecklaceId,
+  PantsColorId,
+  ShirtStyleId,
+  ShoeColorId,
+  WristbandId,
+} from '../../game/types'
 
 export function ShopScreen() {
   const shopPlayer = useGameStore((s) => s.shopPlayer)
@@ -29,6 +62,14 @@ export function ShopScreen() {
   const equipOrBuyGlasses = useGameStore((s) => s.equipOrBuyGlasses)
   const equipOrBuyWatch = useGameStore((s) => s.equipOrBuyWatch)
   const equipOrBuyHeadband = useGameStore((s) => s.equipOrBuyHeadband)
+  const equipOrBuyCap = useGameStore((s) => s.equipOrBuyCap)
+  const equipOrBuyBeard = useGameStore((s) => s.equipOrBuyBeard)
+  const equipOrBuyPantsColor = useGameStore((s) => s.equipOrBuyPantsColor)
+  const equipOrBuyShoeColor = useGameStore((s) => s.equipOrBuyShoeColor)
+  const equipOrBuyNecklace = useGameStore((s) => s.equipOrBuyNecklace)
+  const equipOrBuyWristband = useGameStore((s) => s.equipOrBuyWristband)
+  const equipOrBuyCape = useGameStore((s) => s.equipOrBuyCape)
+  const equipCrown = useGameStore((s) => s.equipCrown)
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -122,6 +163,62 @@ export function ShopScreen() {
   function confirmHeadband(want: boolean) {
     if (!equipOrBuyHeadband(shopPlayer!, want)) {
       setError('Nicht genug Münzen für das Stirnband.')
+      return
+    }
+    setError('')
+  }
+
+  function confirmCap(style: CapStyleId) {
+    if (!equipOrBuyCap(shopPlayer!, style)) {
+      setError('Nicht genug Münzen für diese Kopfbedeckung.')
+      return
+    }
+    setError('')
+  }
+
+  function confirmBeard(style: BeardStyleId) {
+    if (!equipOrBuyBeard(shopPlayer!, style)) {
+      setError('Nicht genug Münzen für diesen Bart.')
+      return
+    }
+    setError('')
+  }
+
+  function confirmPantsColor(color: PantsColorId) {
+    if (!equipOrBuyPantsColor(shopPlayer!, color)) {
+      setError('Nicht genug Münzen für diese Hosenfarbe.')
+      return
+    }
+    setError('')
+  }
+
+  function confirmShoeColor(color: ShoeColorId) {
+    if (!equipOrBuyShoeColor(shopPlayer!, color)) {
+      setError('Nicht genug Münzen für diese Schuhfarbe.')
+      return
+    }
+    setError('')
+  }
+
+  function confirmNecklace(style: NecklaceId) {
+    if (!equipOrBuyNecklace(shopPlayer!, style)) {
+      setError('Nicht genug Münzen für diese Kette.')
+      return
+    }
+    setError('')
+  }
+
+  function confirmWristband(style: WristbandId) {
+    if (!equipOrBuyWristband(shopPlayer!, style)) {
+      setError('Nicht genug Münzen für dieses Armband.')
+      return
+    }
+    setError('')
+  }
+
+  function confirmCape(style: CapeId) {
+    if (!equipOrBuyCape(shopPlayer!, style)) {
+      setError('Nicht genug Münzen für dieses Cape.')
       return
     }
     setError('')
@@ -346,6 +443,249 @@ export function ShopScreen() {
               </button>
             )}
           </section>
+
+          <section className="shop-section panel">
+            <h3 style={{ marginTop: 0 }}>Kopfbedeckung</h3>
+            <div className="shop-option-row">
+              {CAP_STYLES.map((c) => {
+                const owned = isCapStyleOwned(ownership, c.id)
+                return (
+                  <button
+                    key={c.id}
+                    className={`shop-option-btn ${draft.capStyle === c.id ? 'active' : ''}`}
+                    onClick={() => setDraft((d) => ({ ...d, capStyle: c.id }))}
+                  >
+                    <span>{c.title}</span>
+                    {!owned && <span className="shop-price">🪙 {c.price}</span>}
+                    {owned && loadout.capStyle === c.id && <span className="shop-owned">Ausgerüstet</span>}
+                  </button>
+                )
+              })}
+            </div>
+            {draft.capStyle !== loadout.capStyle && (
+              <button
+                className="btn"
+                disabled={!isCapStyleOwned(ownership, draft.capStyle) && coins < capStylePrice(draft.capStyle)}
+                onClick={() => confirmCap(draft.capStyle)}
+              >
+                {isCapStyleOwned(ownership, draft.capStyle) ? 'Ausrüsten' : `Kaufen für ${capStylePrice(draft.capStyle)} 🪙`}
+              </button>
+            )}
+          </section>
+
+          <section className="shop-section panel">
+            <h3 style={{ marginTop: 0 }}>Bart</h3>
+            <div className="shop-option-row">
+              {BEARD_STYLES.map((b) => {
+                const owned = isBeardStyleOwned(ownership, b.id, config.hasBeard)
+                return (
+                  <button
+                    key={b.id}
+                    className={`shop-option-btn ${draft.beardStyle === b.id ? 'active' : ''}`}
+                    onClick={() => setDraft((d) => ({ ...d, beardStyle: b.id }))}
+                  >
+                    <span>{b.title}</span>
+                    {!owned && <span className="shop-price">🪙 {b.price}</span>}
+                    {owned && loadout.beardStyle === b.id && <span className="shop-owned">Ausgerüstet</span>}
+                  </button>
+                )
+              })}
+            </div>
+            {draft.beardStyle !== loadout.beardStyle && (
+              <button
+                className="btn"
+                disabled={
+                  !isBeardStyleOwned(ownership, draft.beardStyle, config.hasBeard) &&
+                  coins < beardStylePrice(draft.beardStyle, config.hasBeard)
+                }
+                onClick={() => confirmBeard(draft.beardStyle)}
+              >
+                {isBeardStyleOwned(ownership, draft.beardStyle, config.hasBeard)
+                  ? 'Ausrüsten'
+                  : `Kaufen für ${beardStylePrice(draft.beardStyle, config.hasBeard)} 🪙`}
+              </button>
+            )}
+          </section>
+
+          <section className="shop-section panel">
+            <h3 style={{ marginTop: 0 }}>Hosenfarbe</h3>
+            <div className="shop-option-row">
+              {PANTS_COLORS.map((p) => {
+                const owned = isPantsColorOwned(ownership, p.id)
+                return (
+                  <button
+                    key={p.id}
+                    className={`shop-option-btn ${draft.pantsColor === p.id ? 'active' : ''}`}
+                    onClick={() => setDraft((d) => ({ ...d, pantsColor: p.id }))}
+                  >
+                    <span>{p.title}</span>
+                    {!owned && <span className="shop-price">🪙 {p.price}</span>}
+                    {owned && loadout.pantsColor === p.id && <span className="shop-owned">Ausgerüstet</span>}
+                  </button>
+                )
+              })}
+            </div>
+            {draft.pantsColor !== loadout.pantsColor && (
+              <button
+                className="btn"
+                disabled={!isPantsColorOwned(ownership, draft.pantsColor) && coins < pantsColorPrice(draft.pantsColor)}
+                onClick={() => confirmPantsColor(draft.pantsColor)}
+              >
+                {isPantsColorOwned(ownership, draft.pantsColor)
+                  ? 'Ausrüsten'
+                  : `Kaufen für ${pantsColorPrice(draft.pantsColor)} 🪙`}
+              </button>
+            )}
+          </section>
+
+          <section className="shop-section panel">
+            <h3 style={{ marginTop: 0 }}>Schuhfarbe</h3>
+            <div className="shop-option-row">
+              {SHOE_COLORS.map((s) => {
+                const owned = isShoeColorOwned(ownership, s.id)
+                return (
+                  <button
+                    key={s.id}
+                    className={`shop-option-btn ${draft.shoeColor === s.id ? 'active' : ''}`}
+                    onClick={() => setDraft((d) => ({ ...d, shoeColor: s.id }))}
+                  >
+                    <span>{s.title}</span>
+                    {!owned && <span className="shop-price">🪙 {s.price}</span>}
+                    {owned && loadout.shoeColor === s.id && <span className="shop-owned">Ausgerüstet</span>}
+                  </button>
+                )
+              })}
+            </div>
+            {draft.shoeColor !== loadout.shoeColor && (
+              <button
+                className="btn"
+                disabled={!isShoeColorOwned(ownership, draft.shoeColor) && coins < shoeColorPrice(draft.shoeColor)}
+                onClick={() => confirmShoeColor(draft.shoeColor)}
+              >
+                {isShoeColorOwned(ownership, draft.shoeColor)
+                  ? 'Ausrüsten'
+                  : `Kaufen für ${shoeColorPrice(draft.shoeColor)} 🪙`}
+              </button>
+            )}
+          </section>
+
+          <section className="shop-section panel">
+            <h3 style={{ marginTop: 0 }}>Kette</h3>
+            <div className="shop-option-row">
+              {NECKLACES.map((n) => {
+                const owned = isNecklaceOwned(ownership, n.id)
+                return (
+                  <button
+                    key={n.id}
+                    className={`shop-option-btn ${draft.necklace === n.id ? 'active' : ''}`}
+                    onClick={() => setDraft((d) => ({ ...d, necklace: n.id }))}
+                  >
+                    <span>{n.title}</span>
+                    {!owned && <span className="shop-price">🪙 {n.price}</span>}
+                    {owned && loadout.necklace === n.id && <span className="shop-owned">Ausgerüstet</span>}
+                  </button>
+                )
+              })}
+            </div>
+            {draft.necklace !== loadout.necklace && (
+              <button
+                className="btn"
+                disabled={!isNecklaceOwned(ownership, draft.necklace) && coins < necklacePrice(draft.necklace)}
+                onClick={() => confirmNecklace(draft.necklace)}
+              >
+                {isNecklaceOwned(ownership, draft.necklace) ? 'Ausrüsten' : `Kaufen für ${necklacePrice(draft.necklace)} 🪙`}
+              </button>
+            )}
+          </section>
+
+          <section className="shop-section panel">
+            <h3 style={{ marginTop: 0 }}>Armband</h3>
+            <div className="shop-option-row">
+              {WRISTBANDS.map((w) => {
+                const owned = isWristbandOwned(ownership, w.id)
+                return (
+                  <button
+                    key={w.id}
+                    className={`shop-option-btn ${draft.wristband === w.id ? 'active' : ''}`}
+                    onClick={() => setDraft((d) => ({ ...d, wristband: w.id }))}
+                  >
+                    <span>{w.title}</span>
+                    {!owned && <span className="shop-price">🪙 {w.price}</span>}
+                    {owned && loadout.wristband === w.id && <span className="shop-owned">Ausgerüstet</span>}
+                  </button>
+                )
+              })}
+            </div>
+            {draft.wristband !== loadout.wristband && (
+              <button
+                className="btn"
+                disabled={!isWristbandOwned(ownership, draft.wristband) && coins < wristbandPrice(draft.wristband)}
+                onClick={() => confirmWristband(draft.wristband)}
+              >
+                {isWristbandOwned(ownership, draft.wristband)
+                  ? 'Ausrüsten'
+                  : `Kaufen für ${wristbandPrice(draft.wristband)} 🪙`}
+              </button>
+            )}
+          </section>
+
+          <section className="shop-section panel">
+            <h3 style={{ marginTop: 0 }}>Cape</h3>
+            <div className="shop-option-row">
+              {CAPES.map((c) => {
+                const owned = isCapeOwned(ownership, c.id)
+                return (
+                  <button
+                    key={c.id}
+                    className={`shop-option-btn ${draft.cape === c.id ? 'active' : ''}`}
+                    onClick={() => setDraft((d) => ({ ...d, cape: c.id }))}
+                  >
+                    <span>{c.title}</span>
+                    {!owned && <span className="shop-price">🪙 {c.price}</span>}
+                    {owned && loadout.cape === c.id && <span className="shop-owned">Ausgerüstet</span>}
+                  </button>
+                )
+              })}
+            </div>
+            {draft.cape !== loadout.cape && (
+              <button
+                className="btn"
+                disabled={!isCapeOwned(ownership, draft.cape) && coins < capePrice(draft.cape)}
+                onClick={() => confirmCape(draft.cape)}
+              >
+                {isCapeOwned(ownership, draft.cape) ? 'Ausrüsten' : `Kaufen für ${capePrice(draft.cape)} 🪙`}
+              </button>
+            )}
+          </section>
+
+          {ownership.crown && (
+            <section className="shop-section panel">
+              <h3 style={{ marginTop: 0 }}>👑 Krone (Wochensieger-Bonus)</h3>
+              <p className="subtitle" style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}>
+                Nicht käuflich - wird automatisch vergeben, wenn dieser Charakter eine Woche gewinnt.
+              </p>
+              <div className="shop-option-row">
+                <button
+                  className={`shop-option-btn ${!draft.crown ? 'active' : ''}`}
+                  onClick={() => setDraft((d) => ({ ...d, crown: false }))}
+                >
+                  Ohne
+                </button>
+                <button
+                  className={`shop-option-btn ${draft.crown ? 'active' : ''}`}
+                  onClick={() => setDraft((d) => ({ ...d, crown: true }))}
+                >
+                  <span>Mit Krone</span>
+                  {loadout.crown && draft.crown && <span className="shop-owned">Ausgerüstet</span>}
+                </button>
+              </div>
+              {draft.crown !== loadout.crown && (
+                <button className="btn" onClick={() => equipCrown(shopPlayer!, draft.crown)}>
+                  Ausrüsten
+                </button>
+              )}
+            </section>
+          )}
         </div>
       </div>
     </div>

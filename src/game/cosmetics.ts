@@ -1,4 +1,18 @@
-import type { AvatarConfig, CosmeticLoadout, CosmeticOwnership, GlassesStyleId, HairStyleId, ShirtStyleId } from './types'
+import type {
+  AvatarConfig,
+  BeardStyleId,
+  CapeId,
+  CapStyleId,
+  CosmeticLoadout,
+  CosmeticOwnership,
+  GlassesStyleId,
+  HairStyleId,
+  NecklaceId,
+  PantsColorId,
+  ShirtStyleId,
+  ShoeColorId,
+  WristbandId,
+} from './types'
 
 export interface HairStyleDef {
   id: HairStyleId
@@ -14,6 +28,48 @@ export interface ShirtStyleDef {
 
 export interface GlassesStyleDef {
   id: GlassesStyleId
+  title: string
+  price: number
+}
+
+export interface CapStyleDef {
+  id: CapStyleId
+  title: string
+  price: number
+}
+
+export interface BeardStyleDef {
+  id: BeardStyleId
+  title: string
+  price: number
+}
+
+export interface PantsColorDef {
+  id: PantsColorId
+  title: string
+  price: number
+}
+
+export interface ShoeColorDef {
+  id: ShoeColorId
+  title: string
+  price: number
+}
+
+export interface NecklaceDef {
+  id: NecklaceId
+  title: string
+  price: number
+}
+
+export interface WristbandDef {
+  id: WristbandId
+  title: string
+  price: number
+}
+
+export interface CapeDef {
+  id: CapeId
   title: string
   price: number
 }
@@ -42,14 +98,62 @@ export const GLASSES_STYLES: GlassesStyleDef[] = [
   { id: 'abgespaced', title: 'Abgespacte Sonnenbrille', price: 65 },
 ]
 
+export const CAP_STYLES: CapStyleDef[] = [
+  { id: 'none', title: 'Ohne', price: 0 },
+  { id: 'baseball', title: 'Baseballcap', price: 35 },
+  { id: 'beanie', title: 'Wintermütze', price: 30 },
+  { id: 'party', title: 'Partyhut', price: 50 },
+]
+
+export const BEARD_STYLES: BeardStyleDef[] = [
+  { id: 'none', title: 'Ohne', price: 0 },
+  { id: 'vollbart', title: 'Vollbart', price: 55 },
+  { id: 'schnurrbart', title: 'Schnurrbart', price: 35 },
+]
+
+export const PANTS_COLORS: PantsColorDef[] = [
+  { id: 'standard', title: 'Standard', price: 0 },
+  { id: 'schwarz', title: 'Schwarz', price: 20 },
+  { id: 'khaki', title: 'Khaki', price: 20 },
+  { id: 'rot', title: 'Rot', price: 25 },
+  { id: 'camo', title: 'Tarnmuster', price: 45 },
+]
+
+export const SHOE_COLORS: ShoeColorDef[] = [
+  { id: 'standard', title: 'Standard', price: 0 },
+  { id: 'weiss', title: 'Weiß', price: 15 },
+  { id: 'rot', title: 'Rot', price: 20 },
+  { id: 'neongruen', title: 'Neongrün', price: 25 },
+]
+
+export const NECKLACES: NecklaceDef[] = [
+  { id: 'none', title: 'Ohne', price: 0 },
+  { id: 'gold', title: 'Goldkette', price: 40 },
+  { id: 'silber', title: 'Silberkette', price: 30 },
+]
+
+export const WRISTBANDS: WristbandDef[] = [
+  { id: 'none', title: 'Ohne', price: 0 },
+  { id: 'rot', title: 'Rotes Armband', price: 15 },
+  { id: 'blau', title: 'Blaues Armband', price: 15 },
+  { id: 'schwarz', title: 'Schwarzes Armband', price: 15 },
+]
+
+export const CAPES: CapeDef[] = [
+  { id: 'none', title: 'Ohne', price: 0 },
+  { id: 'rot', title: 'Rotes Umhang', price: 60 },
+  { id: 'gold', title: 'Goldenes Umhang', price: 80 },
+]
+
 export const GLOVES_PRICE = 30
 export const WATCH_PRICE = 90
 export const HEADBAND_PRICE = 25
 
-/** Charaktere mit fester "hasGlasses"-Eigenschaft (Dirk/Fabian) starten mit der 'cool'-Brille
- * ausgerüstet statt mit einer vom Shop unabhängigen Extra-Geometrie (Bugfix: Shop zeigte "Ohne"
- * als ausgerüstet, während im 3D-Modell trotzdem eine Brille zu sehen war). So zeigen Shop und
- * 3D-Modell immer denselben Zustand, und die feste Eigenschaft lässt sich sogar abwählen. */
+/** Charaktere mit fester "hasGlasses"/"hasBeard"-Eigenschaft (Dirk/Fabian) starten mit der
+ * jeweiligen Standard-Variante ausgerüstet statt mit einer vom Shop unabhängigen Extra-Geometrie
+ * (Bugfix: Shop zeigte "Ohne" als ausgerüstet, während im 3D-Modell trotzdem eine Brille/Bart zu
+ * sehen war). So zeigen Shop und 3D-Modell immer denselben Zustand, und die feste Eigenschaft
+ * lässt sich sogar abwählen. */
 export function defaultLoadout(config: AvatarConfig): CosmeticLoadout {
   return {
     hairStyle: 'standard',
@@ -59,11 +163,34 @@ export function defaultLoadout(config: AvatarConfig): CosmeticLoadout {
     glassesStyle: config.hasGlasses ? 'cool' : 'none',
     watch: false,
     headband: false,
+    capStyle: 'none',
+    beardStyle: config.hasBeard ? 'vollbart' : 'none',
+    pantsColor: 'standard',
+    shoeColor: 'standard',
+    necklace: 'none',
+    wristband: 'none',
+    cape: 'none',
+    crown: false,
   }
 }
 
 export function emptyOwnership(): CosmeticOwnership {
-  return { hairStyles: [], shirtStyles: [], gloves: false, glassesStyles: [], watch: false, headband: false }
+  return {
+    hairStyles: [],
+    shirtStyles: [],
+    gloves: false,
+    glassesStyles: [],
+    watch: false,
+    headband: false,
+    capStyles: [],
+    beardStyles: [],
+    pantsColors: [],
+    shoeColors: [],
+    necklaces: [],
+    wristbands: [],
+    capes: [],
+    crown: false,
+  }
 }
 
 export function isHairStyleOwned(ownership: CosmeticOwnership, id: HairStyleId): boolean {
@@ -81,6 +208,35 @@ export function isGlassesStyleOwned(ownership: CosmeticOwnership, id: GlassesSty
   return id === 'none' || (id === 'cool' && hasGlassesTrait) || ownership.glassesStyles.includes(id)
 }
 
+export function isCapStyleOwned(ownership: CosmeticOwnership, id: CapStyleId): boolean {
+  return id === 'none' || ownership.capStyles.includes(id)
+}
+
+/** hasBeardTrait: analog zu isGlassesStyleOwned - Dirk/Fabian besitzen 'vollbart' kostenlos. */
+export function isBeardStyleOwned(ownership: CosmeticOwnership, id: BeardStyleId, hasBeardTrait: boolean): boolean {
+  return id === 'none' || (id === 'vollbart' && hasBeardTrait) || ownership.beardStyles.includes(id)
+}
+
+export function isPantsColorOwned(ownership: CosmeticOwnership, id: PantsColorId): boolean {
+  return id === 'standard' || ownership.pantsColors.includes(id)
+}
+
+export function isShoeColorOwned(ownership: CosmeticOwnership, id: ShoeColorId): boolean {
+  return id === 'standard' || ownership.shoeColors.includes(id)
+}
+
+export function isNecklaceOwned(ownership: CosmeticOwnership, id: NecklaceId): boolean {
+  return id === 'none' || ownership.necklaces.includes(id)
+}
+
+export function isWristbandOwned(ownership: CosmeticOwnership, id: WristbandId): boolean {
+  return id === 'none' || ownership.wristbands.includes(id)
+}
+
+export function isCapeOwned(ownership: CosmeticOwnership, id: CapeId): boolean {
+  return id === 'none' || ownership.capes.includes(id)
+}
+
 export function hairStylePrice(id: HairStyleId): number {
   return HAIRSTYLES.find((h) => h.id === id)?.price ?? 0
 }
@@ -92,4 +248,33 @@ export function shirtStylePrice(id: ShirtStyleId): number {
 export function glassesStylePrice(id: GlassesStyleId, hasGlassesTrait: boolean): number {
   if (id === 'cool' && hasGlassesTrait) return 0
   return GLASSES_STYLES.find((g) => g.id === id)?.price ?? 0
+}
+
+export function capStylePrice(id: CapStyleId): number {
+  return CAP_STYLES.find((c) => c.id === id)?.price ?? 0
+}
+
+export function beardStylePrice(id: BeardStyleId, hasBeardTrait: boolean): number {
+  if (id === 'vollbart' && hasBeardTrait) return 0
+  return BEARD_STYLES.find((b) => b.id === id)?.price ?? 0
+}
+
+export function pantsColorPrice(id: PantsColorId): number {
+  return PANTS_COLORS.find((p) => p.id === id)?.price ?? 0
+}
+
+export function shoeColorPrice(id: ShoeColorId): number {
+  return SHOE_COLORS.find((s) => s.id === id)?.price ?? 0
+}
+
+export function necklacePrice(id: NecklaceId): number {
+  return NECKLACES.find((n) => n.id === id)?.price ?? 0
+}
+
+export function wristbandPrice(id: WristbandId): number {
+  return WRISTBANDS.find((w) => w.id === id)?.price ?? 0
+}
+
+export function capePrice(id: CapeId): number {
+  return CAPES.find((c) => c.id === id)?.price ?? 0
 }

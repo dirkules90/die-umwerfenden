@@ -22,10 +22,20 @@ export type ShirtStyleId = 'standard' | 'blitz' | 'umwerfenden'
 /** 'none' fällt auf die feste Charakterbrille (AvatarConfig.hasGlasses) zurück, falls vorhanden -
  * eine gekaufte Shop-Brille ersetzt diese sonst optisch (Teil: Shop-Erweiterung). */
 export type GlassesStyleId = 'none' | 'cool' | 'abgespaced'
+export type CapStyleId = 'none' | 'baseball' | 'beanie' | 'party'
+/** 'none' fällt auf den festen Charakterbart (AvatarConfig.hasBeard) zurück, falls vorhanden -
+ * analog zu GlassesStyleId (Teil: Shop-Erweiterung). */
+export type BeardStyleId = 'none' | 'vollbart' | 'schnurrbart'
+export type PantsColorId = 'standard' | 'schwarz' | 'khaki' | 'rot' | 'camo'
+export type ShoeColorId = 'standard' | 'weiss' | 'rot' | 'neongruen'
+export type NecklaceId = 'none' | 'gold' | 'silber'
+export type WristbandId = 'none' | 'rot' | 'blau' | 'schwarz'
+export type CapeId = 'none' | 'rot' | 'gold'
 
 /** Individuelle Erscheinung eines Charakters im 3D-Modell (Teil: Kosmetik-Shop) - unabhängig von
- * der festen AvatarConfig (Statur, Hautfarbe, Bart/Brille bleiben Charaktermerkmale, keine
- * Shop-Ware). hairColor ist bewusst frei wählbar statt fest wie in AvatarConfig. */
+ * der festen AvatarConfig (Statur, Hautfarbe, feste Bart-/Brillen-EIGENSCHAFT bleiben
+ * Charaktermerkmale, siehe defaultLoadout). hairColor ist bewusst frei wählbar statt fest wie in
+ * AvatarConfig. */
 export interface CosmeticLoadout {
   hairStyle: HairStyleId
   hairColor: string
@@ -34,6 +44,16 @@ export interface CosmeticLoadout {
   glassesStyle: GlassesStyleId
   watch: boolean
   headband: boolean
+  capStyle: CapStyleId
+  beardStyle: BeardStyleId
+  pantsColor: PantsColorId
+  shoeColor: ShoeColorId
+  necklace: NecklaceId
+  wristband: WristbandId
+  cape: CapeId
+  /** Exklusiv, nicht käuflich - wird automatisch vergeben, wenn ein Charakter Wochensieger wird
+   * (siehe state/gameStore.ts processDailyAndWeeklyRollover). */
+  crown: boolean
 }
 
 /** Welche Items ein Charakter bereits gekauft hat - 'standard'/'none' sind immer und für alle
@@ -45,6 +65,14 @@ export interface CosmeticOwnership {
   glassesStyles: GlassesStyleId[]
   watch: boolean
   headband: boolean
+  capStyles: CapStyleId[]
+  beardStyles: BeardStyleId[]
+  pantsColors: PantsColorId[]
+  shoeColors: ShoeColorId[]
+  necklaces: NecklaceId[]
+  wristbands: WristbandId[]
+  capes: CapeId[]
+  crown: boolean
 }
 
 export interface CharacterCosmetics {

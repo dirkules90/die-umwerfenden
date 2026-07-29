@@ -1,6 +1,67 @@
 import * as THREE from 'three'
-import type { AvatarConfig, CosmeticLoadout, GlassesStyleId, HairStyleId, ShirtStyleId } from '../game/types'
+import type {
+  AvatarConfig,
+  BeardStyleId,
+  CapStyleId,
+  CosmeticLoadout,
+  GlassesStyleId,
+  HairStyleId,
+  PantsColorId,
+  ShirtStyleId,
+  ShoeColorId,
+  WristbandId,
+} from '../game/types'
 import { drawFace, type Mood } from './faceArt'
+
+const PANTS_COLORS: Record<PantsColorId, number> = {
+  standard: 0x3a4a5c,
+  schwarz: 0x1c1c1c,
+  khaki: 0x8a7a4e,
+  rot: 0x8c2f2f,
+  camo: 0x5c5f3a,
+}
+
+const SHOE_COLORS: Record<ShoeColorId, number> = {
+  standard: 0x2a2420,
+  weiss: 0xf2f2ec,
+  rot: 0x8c2f2f,
+  neongruen: 0x8fff4d,
+}
+
+const WRISTBAND_COLORS: Record<Exclude<WristbandId, 'none'>, number> = {
+  rot: 0xc0392b,
+  blau: 0x2f6fb0,
+  schwarz: 0x1c1c1c,
+}
+
+/** Kleine kachelbare Tarnmuster-Textur (Teil: Shop-Erweiterung) - dieselbe Technik wie das
+ * Blitz-Shirt-Badge (buildBlitzBadgeTexture): ein Canvas statt einer externen Bilddatei. */
+function buildCamoTexture(): THREE.Texture {
+  const canvas = document.createElement('canvas')
+  canvas.width = 64
+  canvas.height = 64
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = '#5c5f3a'
+  ctx.fillRect(0, 0, 64, 64)
+  const blobColors = ['#43502c', '#7a7a52', '#33351f']
+  let seed = 42
+  const rand = () => {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff
+    return (seed % 1000) / 1000
+  }
+  for (let i = 0; i < 10; i++) {
+    ctx.fillStyle = blobColors[i % blobColors.length]
+    ctx.beginPath()
+    ctx.ellipse(rand() * 64, rand() * 64, 10 + rand() * 10, 6 + rand() * 8, rand() * Math.PI, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.wrapS = THREE.RepeatWrapping
+  texture.wrapT = THREE.RepeatWrapping
+  texture.repeat.set(2, 2)
+  return texture
+}
 
 export type CharacterAnimState = 'idle' | 'backswing' | 'throw' | 'cheer' | 'meh' | 'disappointed'
 
@@ -123,8 +184,13 @@ export class CharacterModel {
     const shirtMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 })
     const accentMat = new THREE.MeshStandardMaterial({ color: config.shirtAccent, roughness: 0.8 })
     const hairMat = new THREE.MeshStandardMaterial({ color: cosmetics.hairColor, roughness: 0.6 })
-    const pantsMat = new THREE.MeshStandardMaterial({ color: 0x3a4a5c, roughness: 0.9 })
-    const shoeMat = new THREE.MeshStandardMaterial({ color: 0x2a2420, roughness: 0.6 })
+    // Hosenfarbe/Schuhfarbe (Teil: Shop-Erweiterung) statt fester Farben - Tarnmuster bekommt
+    // zusätzlich eine gekachelte Canvas-Textur statt nur einer flachen Farbe.
+    const pantsMat = new THREE.MeshStandardMaterial({ color: PANTS_COLORS[cosmetics.pantsColor], roughness: 0.9 })
+    if (cosmetics.pantsColor === 'camo') {
+      pantsMat.map = buildCamoTexture()
+    }
+    const shoeMat = new THREE.MeshStandardMaterial({ color: SHOE_COLORS[cosmetics.shoeColor], roughness: 0.6 })
     const gloveMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.5 })
 
     // Beine + Schuhe (Boden bis Hüfte y=0.58)
@@ -165,6 +231,34 @@ export class CharacterModel {
     this.torsoGroup.add(collar)
 
     this.buildShirtBadge(cosmetics.shirtStyle)
+
+    if (cosmetics.necklace !== 'none') {
+      // Kette knapp unterhalb des Kragens (Teil: Shop-Erweiterung) - ein schräg liegender Torus
+      // wirkt an der Brust glaubwürdiger als ein flach aufliegender Ring.
+      const necklaceMat = new THREE.MeshStandardMaterial({
+        color: cosmetics.necklace === 'gold' ? 0xd4af37 : 0xc7ccd1,
+        roughness: 0.3,
+        metalness: 0.6,
+      })
+      const necklace = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.012, 8, 16), necklaceMat)
+      necklace.rotation.x = Math.PI / 2.3
+      necklace.position.y = 0.92
+      this.torsoGroup.add(necklace)
+    }
+
+    if (cosmetics.cape !== 'none') {
+      // Einfache Stoffbahn hinter den Schultern (Teil: Shop-Erweiterung) - eine leicht gebogene
+      // Ebene statt aufwendiger Stoffsimulation, reicht für den kosmetischen Effekt völlig aus.
+      const capeMat = new THREE.MeshStandardMaterial({
+        color: cosmetics.cape === 'gold' ? 0xd4af37 : 0x8c2f2f,
+        roughness: 0.85,
+        side: THREE.DoubleSide,
+      })
+      const cape = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.5, 1, 6), capeMat)
+      cape.position.set(0, 0.72, -0.135)
+      cape.rotation.x = 0.15
+      this.torsoGroup.add(cape)
+    }
 
     this.group.add(this.torsoGroup)
 
@@ -221,6 +315,20 @@ export class CharacterModel {
       this.rightArmPivot.add(face)
     }
 
+    if (cosmetics.wristband !== 'none') {
+      // Am LINKEN Handgelenk statt am rechten (Teil: Shop-Erweiterung) - so bleibt Armbanduhr und
+      // Armband gleichzeitig sichtbar statt sich am selben Arm zu überlagern.
+      const bandMat = new THREE.MeshStandardMaterial({
+        color: WRISTBAND_COLORS[cosmetics.wristband],
+        roughness: 0.7,
+      })
+      const wristbandY = -ARM_LENGTH + 0.09
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.066, 0.017, 8, 12), bandMat)
+      band.rotation.x = Math.PI / 2
+      band.position.y = wristbandY
+      this.leftArmPivot.add(band)
+    }
+
     // Kopf (großer Kopf im Verhältnis zum Körper, Mii-artig, Teil 5.4), leicht eiförmig statt
     // perfekt rund gestreckt (Teil: Charaktermodell-Überarbeitung) - näher am Wii-Mii-Vorbild.
     // ALLE kopfoberflächen-gebundenen Teile (Kopf, Frisur, Gesicht, Bart, Brille, Stirnband) hängen
@@ -261,27 +369,34 @@ export class CharacterModel {
     this.faceMesh = new THREE.Mesh(faceGeo, faceMat)
     skullGroup.add(this.faceMesh)
 
-    if (config.hasBeard) {
-      // thetaStart vorher bei 0.45π: die Bart-Oberkante lag dadurch auf Höhe des Munds statt
-      // darunter, sah aus wie ein Bart, der durch den Mund reicht. 0.55π beginnt spürbar unter
-      // der Mundhöhe. phiLength war vorher 2π (kompletter Ring um den ganzen Kopf) statt nur die
-      // Vorderseite - sah dadurch wie eine durchgehende Balaclava/Kragen statt eines Bartes aus
-      // (Bugfix: "Bart sitzt nicht richtig"). Jetzt nur noch ein vorderer Bogen über Kinn/Wangen.
-      const beardPhiWidth = 2.3
-      const beard = new THREE.Mesh(
-        new THREE.SphereGeometry(
-          headRadius * 0.78,
-          12,
-          10,
-          Math.PI / 2 - beardPhiWidth / 2,
-          beardPhiWidth,
-          Math.PI * 0.55,
-          Math.PI * 0.32,
-        ),
-        hairMat,
-      )
-      beard.position.set(0, -0.09, 0.04)
-      skullGroup.add(beard)
+    // Bart rein über cosmetics.beardStyle gesteuert (Bugfix Shop-Erweiterung, analog zur Brille
+    // oben) - die feste "hasBeard"-Eigenschaft (Dirk/Fabian) ist jetzt nur noch der Standard-
+    // Loadout-Wert (siehe defaultLoadout) und für diese Charaktere eine kostenlose Option (siehe
+    // isBeardStyleOwned), damit Shop-Anzeige und 3D-Modell wieder übereinstimmen.
+    const effectiveBeardStyle: BeardStyleId =
+      cosmetics.beardStyle !== 'none' ? cosmetics.beardStyle : config.hasBeard ? 'vollbart' : 'none'
+    if (effectiveBeardStyle !== 'none') {
+      this.buildBeard(effectiveBeardStyle, headRadius, hairMat, skullGroup)
+    }
+
+    if (cosmetics.capStyle !== 'none') {
+      this.buildCap(cosmetics.capStyle, headRadius, skullGroup)
+    }
+
+    if (cosmetics.crown) {
+      // Exklusiv, nicht käuflich - Wochensieger-Bonus (siehe gameStore.grantCrown). Einfache
+      // goldene Zackenkrone knapp über dem Scheitel.
+      const goldMat = new THREE.MeshStandardMaterial({ color: 0xffd447, roughness: 0.25, metalness: 0.65 })
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(headRadius * 0.72, headRadius * 0.78, 0.05, 12), goldMat)
+      band.position.y = headRadius * 0.95
+      skullGroup.add(band)
+      const spikeCount = 5
+      for (let i = 0; i < spikeCount; i++) {
+        const t = (i / (spikeCount - 1) - 0.5) * 2
+        const spike = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.06, 6), goldMat)
+        spike.position.set(t * headRadius * 0.55, headRadius * 1.02, 0)
+        skullGroup.add(spike)
+      }
     }
 
     // Sonnenbrille rein über cosmetics.glassesStyle gesteuert (Bugfix Shop-Erweiterung) - vorher
@@ -339,6 +454,86 @@ export class CharacterModel {
     const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.011, 0.011), frameMat)
     bridge.position.set(0, 0.01, headRadius)
     parent.add(bridge)
+  }
+
+  /** 'vollbart' = voller Bart über Kinn/Wangen (die ursprüngliche Bart-Geometrie), 'schnurrbart' =
+   * nur ein kleiner Streifen direkt über der Oberlippe (Teil: Shop-Erweiterung). */
+  private buildBeard(style: BeardStyleId, headRadius: number, hairMat: THREE.Material, parent: THREE.Group) {
+    if (style === 'schnurrbart') {
+      const width = 1.1
+      const moustache = new THREE.Mesh(
+        new THREE.SphereGeometry(headRadius * 0.72, 12, 8, Math.PI / 2 - width / 2, width, Math.PI * 0.49, 0.09),
+        hairMat,
+      )
+      moustache.position.set(0, -0.03, 0.05)
+      parent.add(moustache)
+      return
+    }
+    // thetaStart vorher bei 0.45π: die Bart-Oberkante lag dadurch auf Höhe des Munds statt
+    // darunter, sah aus wie ein Bart, der durch den Mund reicht. 0.55π beginnt spürbar unter
+    // der Mundhöhe. phiLength war vorher 2π (kompletter Ring um den ganzen Kopf) statt nur die
+    // Vorderseite - sah dadurch wie eine durchgehende Balaclava/Kragen statt eines Bartes aus
+    // (Bugfix: "Bart sitzt nicht richtig"). Jetzt nur noch ein vorderer Bogen über Kinn/Wangen.
+    const beardPhiWidth = 2.3
+    const beard = new THREE.Mesh(
+      new THREE.SphereGeometry(
+        headRadius * 0.78,
+        12,
+        10,
+        Math.PI / 2 - beardPhiWidth / 2,
+        beardPhiWidth,
+        Math.PI * 0.55,
+        Math.PI * 0.32,
+      ),
+      hairMat,
+    )
+    beard.position.set(0, -0.09, 0.04)
+    parent.add(beard)
+  }
+
+  /** Drei Kopfbedeckungen (Teil: Shop-Erweiterung) - Baseballcap (Kuppel + Schirm), Wintermütze
+   * (Kuppel + umgeschlagener Rand) und Partyhut (Kegel + Bommel), jeweils deutlich unterscheidbar
+   * und OHNE y-Versatz konzentrisch zur Kopfkugel (siehe HAIR_CAP_SCALE-Kommentar oben). */
+  private buildCap(style: CapStyleId, headRadius: number, parent: THREE.Group) {
+    if (style === 'baseball') {
+      const capMat = new THREE.MeshStandardMaterial({ color: 0x2f6fb0, roughness: 0.7 })
+      const dome = new THREE.Mesh(
+        new THREE.SphereGeometry(headRadius * HAIR_CAP_SCALE, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.46),
+        capMat,
+      )
+      parent.add(dome)
+      // Schirm als halbrunde, flach liegende Scheibe vor der Stirn statt eines Zylinderausschnitts
+      // (der hätte eine gebogene Wand statt einer flachen Fläche ergeben).
+      const brim = new THREE.Mesh(new THREE.CircleGeometry(headRadius * 0.55, 16, -Math.PI / 2, Math.PI), capMat)
+      brim.rotation.x = -Math.PI / 2 + 0.25
+      brim.position.set(0, headRadius * 0.02, headRadius * 0.85)
+      parent.add(brim)
+      return
+    }
+    if (style === 'beanie') {
+      const beanieMat = new THREE.MeshStandardMaterial({ color: 0x8c2f2f, roughness: 0.85 })
+      const dome = new THREE.Mesh(
+        new THREE.SphereGeometry(headRadius * HAIR_CAP_SCALE, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.52),
+        beanieMat,
+      )
+      parent.add(dome)
+      const fold = new THREE.Mesh(new THREE.TorusGeometry(headRadius * 0.92, 0.028, 8, 20), beanieMat)
+      fold.rotation.x = Math.PI / 2
+      fold.position.y = headRadius * 0.08
+      parent.add(fold)
+      const pompom = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), new THREE.MeshStandardMaterial({ color: 0xf2f2ec, roughness: 0.9 }))
+      pompom.position.y = headRadius * HAIR_CAP_SCALE
+      parent.add(pompom)
+      return
+    }
+    // party
+    const partyMat = new THREE.MeshStandardMaterial({ color: 0xf4d03f, roughness: 0.6 })
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(headRadius * 0.62, headRadius * 1.6, 12), partyMat)
+    cone.position.y = headRadius * 0.75
+    parent.add(cone)
+    const pompom = new THREE.Mesh(new THREE.SphereGeometry(0.03, 10, 8), new THREE.MeshStandardMaterial({ color: 0xff2fb0, roughness: 0.6 }))
+    pompom.position.y = headRadius * 1.55
+    parent.add(pompom)
   }
 
   /** Vier Frisuren zur Auswahl (Teil: Kosmetik-Shop) - deutlich unterscheidbare Silhouetten statt

@@ -1,5 +1,8 @@
 import { create } from 'zustand'
 import type {
+  BeardStyleId,
+  CapeId,
+  CapStyleId,
   CharacterCosmetics,
   CharacterId,
   DigitSlot,
@@ -7,11 +10,15 @@ import type {
   GameSession,
   GlassesStyleId,
   HairStyleId,
+  NecklaceId,
+  PantsColorId,
   PlayerStatistics,
   RoundResult,
   Settings,
   ShirtStyleId,
+  ShoeColorId,
   TannenbaumSession,
+  WristbandId,
 } from '../game/types'
 import {
   ballReturned,
@@ -39,8 +46,22 @@ import {
   isHairStyleOwned,
   isShirtStyleOwned,
   isGlassesStyleOwned,
+  isCapStyleOwned,
+  isBeardStyleOwned,
+  isPantsColorOwned,
+  isShoeColorOwned,
+  isNecklaceOwned,
+  isWristbandOwned,
+  isCapeOwned,
   shirtStylePrice,
   glassesStylePrice,
+  capStylePrice,
+  beardStylePrice,
+  pantsColorPrice,
+  shoeColorPrice,
+  necklacePrice,
+  wristbandPrice,
+  capePrice,
   GLOVES_PRICE,
   WATCH_PRICE,
   HEADBAND_PRICE,
@@ -146,6 +167,14 @@ interface GameStore {
   equipOrBuyGlasses: (id: CharacterId, style: GlassesStyleId) => boolean
   equipOrBuyWatch: (id: CharacterId, wantWatch: boolean) => boolean
   equipOrBuyHeadband: (id: CharacterId, wantHeadband: boolean) => boolean
+  equipOrBuyCap: (id: CharacterId, style: CapStyleId) => boolean
+  equipOrBuyBeard: (id: CharacterId, style: BeardStyleId) => boolean
+  equipOrBuyPantsColor: (id: CharacterId, color: PantsColorId) => boolean
+  equipOrBuyShoeColor: (id: CharacterId, color: ShoeColorId) => boolean
+  equipOrBuyNecklace: (id: CharacterId, style: NecklaceId) => boolean
+  equipOrBuyWristband: (id: CharacterId, style: WristbandId) => boolean
+  equipOrBuyCape: (id: CharacterId, style: CapeId) => boolean
+  equipCrown: (id: CharacterId, wantCrown: boolean) => boolean
   startGame: (mode: GameMode) => void
   beginAiming: () => void
   submitThrowResult: (pinsDown: number, isGutter: boolean) => void
@@ -195,6 +224,18 @@ function addCoins(
   if (amount <= 0) return cosmeticsMap
   const current = cosmeticsFor(cosmeticsMap, id)
   return { ...cosmeticsMap, [id]: { ...current, coins: current.coins + amount } }
+}
+
+/** Exklusive Wochensieger-Krone (Teil: Shop-Erweiterung) - nicht käuflich, wird nur hier beim
+ * Wochenabschluss vergeben. Bereits besitzende Wochensieger behalten sie über weitere Siege hinweg
+ * natürlich (kein erneutes Eintragen nötig, aber auch kein Schaden). */
+function grantCrown(
+  cosmeticsMap: Partial<Record<CharacterId, CharacterCosmetics>>,
+  id: CharacterId,
+): Partial<Record<CharacterId, CharacterCosmetics>> {
+  const current = cosmeticsFor(cosmeticsMap, id)
+  if (current.ownership.crown) return cosmeticsMap
+  return { ...cosmeticsMap, [id]: { ...current, ownership: { ...current.ownership, crown: true } } }
 }
 
 /**
@@ -251,7 +292,10 @@ function processDailyAndWeeklyRollover(): {
       const cosmetics = loadAllCosmetics()
       const share = Math.floor(WEEKLY_WINNER_COIN_BONUS / weekWinners.length)
       let updatedCosmetics = cosmetics
-      for (const id of weekWinners) updatedCosmetics = addCoins(updatedCosmetics, id, share)
+      for (const id of weekWinners) {
+        updatedCosmetics = addCoins(updatedCosmetics, id, share)
+        updatedCosmetics = grantCrown(updatedCosmetics, id)
+      }
       saveAllCosmetics(updatedCosmetics)
     }
     weekKey = currentWeekKey()
@@ -425,6 +469,153 @@ export const useGameStore = create<GameStore>((set, get) => ({
       updated = { ...current, coins: current.coins - HEADBAND_PRICE, ownership: { ...current.ownership, headband: true } }
     }
     updated = { ...updated, loadout: { ...updated.loadout, headband: wantHeadband } }
+    const cosmetics = { ...get().cosmetics, [id]: updated }
+    saveAllCosmetics(cosmetics)
+    set({ cosmetics })
+    return true
+  },
+
+  equipOrBuyCap: (id, style) => {
+    const current = cosmeticsFor(get().cosmetics, id)
+    let updated = current
+    if (!isCapStyleOwned(current.ownership, style)) {
+      const price = capStylePrice(style)
+      if (current.coins < price) return false
+      updated = {
+        ...current,
+        coins: current.coins - price,
+        ownership: { ...current.ownership, capStyles: [...current.ownership.capStyles, style] },
+      }
+    }
+    updated = { ...updated, loadout: { ...updated.loadout, capStyle: style } }
+    const cosmetics = { ...get().cosmetics, [id]: updated }
+    saveAllCosmetics(cosmetics)
+    set({ cosmetics })
+    return true
+  },
+
+  equipOrBuyBeard: (id, style) => {
+    const current = cosmeticsFor(get().cosmetics, id)
+    const hasBeardTrait = AVATAR_CONFIGS[id].hasBeard
+    let updated = current
+    if (!isBeardStyleOwned(current.ownership, style, hasBeardTrait)) {
+      const price = beardStylePrice(style, hasBeardTrait)
+      if (current.coins < price) return false
+      updated = {
+        ...current,
+        coins: current.coins - price,
+        ownership: { ...current.ownership, beardStyles: [...current.ownership.beardStyles, style] },
+      }
+    }
+    updated = { ...updated, loadout: { ...updated.loadout, beardStyle: style } }
+    const cosmetics = { ...get().cosmetics, [id]: updated }
+    saveAllCosmetics(cosmetics)
+    set({ cosmetics })
+    return true
+  },
+
+  equipOrBuyPantsColor: (id, color) => {
+    const current = cosmeticsFor(get().cosmetics, id)
+    let updated = current
+    if (!isPantsColorOwned(current.ownership, color)) {
+      const price = pantsColorPrice(color)
+      if (current.coins < price) return false
+      updated = {
+        ...current,
+        coins: current.coins - price,
+        ownership: { ...current.ownership, pantsColors: [...current.ownership.pantsColors, color] },
+      }
+    }
+    updated = { ...updated, loadout: { ...updated.loadout, pantsColor: color } }
+    const cosmetics = { ...get().cosmetics, [id]: updated }
+    saveAllCosmetics(cosmetics)
+    set({ cosmetics })
+    return true
+  },
+
+  equipOrBuyShoeColor: (id, color) => {
+    const current = cosmeticsFor(get().cosmetics, id)
+    let updated = current
+    if (!isShoeColorOwned(current.ownership, color)) {
+      const price = shoeColorPrice(color)
+      if (current.coins < price) return false
+      updated = {
+        ...current,
+        coins: current.coins - price,
+        ownership: { ...current.ownership, shoeColors: [...current.ownership.shoeColors, color] },
+      }
+    }
+    updated = { ...updated, loadout: { ...updated.loadout, shoeColor: color } }
+    const cosmetics = { ...get().cosmetics, [id]: updated }
+    saveAllCosmetics(cosmetics)
+    set({ cosmetics })
+    return true
+  },
+
+  equipOrBuyNecklace: (id, style) => {
+    const current = cosmeticsFor(get().cosmetics, id)
+    let updated = current
+    if (!isNecklaceOwned(current.ownership, style)) {
+      const price = necklacePrice(style)
+      if (current.coins < price) return false
+      updated = {
+        ...current,
+        coins: current.coins - price,
+        ownership: { ...current.ownership, necklaces: [...current.ownership.necklaces, style] },
+      }
+    }
+    updated = { ...updated, loadout: { ...updated.loadout, necklace: style } }
+    const cosmetics = { ...get().cosmetics, [id]: updated }
+    saveAllCosmetics(cosmetics)
+    set({ cosmetics })
+    return true
+  },
+
+  equipOrBuyWristband: (id, style) => {
+    const current = cosmeticsFor(get().cosmetics, id)
+    let updated = current
+    if (!isWristbandOwned(current.ownership, style)) {
+      const price = wristbandPrice(style)
+      if (current.coins < price) return false
+      updated = {
+        ...current,
+        coins: current.coins - price,
+        ownership: { ...current.ownership, wristbands: [...current.ownership.wristbands, style] },
+      }
+    }
+    updated = { ...updated, loadout: { ...updated.loadout, wristband: style } }
+    const cosmetics = { ...get().cosmetics, [id]: updated }
+    saveAllCosmetics(cosmetics)
+    set({ cosmetics })
+    return true
+  },
+
+  equipOrBuyCape: (id, style) => {
+    const current = cosmeticsFor(get().cosmetics, id)
+    let updated = current
+    if (!isCapeOwned(current.ownership, style)) {
+      const price = capePrice(style)
+      if (current.coins < price) return false
+      updated = {
+        ...current,
+        coins: current.coins - price,
+        ownership: { ...current.ownership, capes: [...current.ownership.capes, style] },
+      }
+    }
+    updated = { ...updated, loadout: { ...updated.loadout, cape: style } }
+    const cosmetics = { ...get().cosmetics, [id]: updated }
+    saveAllCosmetics(cosmetics)
+    set({ cosmetics })
+    return true
+  },
+
+  /** Die Krone ist nicht käuflich, sondern eine exklusive Trophäe (Teil: Shop-Erweiterung) - nur wer
+   * sie bereits durch einen Wochensieg besitzt (siehe processDailyAndWeeklyRollover), kann sie hier
+   * an-/ausziehen. */
+  equipCrown: (id, wantCrown) => {
+    const current = cosmeticsFor(get().cosmetics, id)
+    if (wantCrown && !current.ownership.crown) return false
+    const updated = { ...current, loadout: { ...current.loadout, crown: wantCrown } }
     const cosmetics = { ...get().cosmetics, [id]: updated }
     saveAllCosmetics(cosmetics)
     set({ cosmetics })
