@@ -2,6 +2,7 @@ import { useGameStore } from '../../state/gameStore'
 import { AVATAR_CONFIGS, CHARACTER_ORDER } from '../../characters/avatarConfigs'
 import { formatPoints } from '../formatPoints'
 import { LeaderboardTabs } from '../components/LeaderboardTabs'
+import { AmbientBackground } from '../components/AmbientBackground'
 
 export function AllTimeScreen() {
   const allTimeBoard = useGameStore((s) => s.allTimeBoard)
@@ -13,6 +14,7 @@ export function AllTimeScreen() {
 
   return (
     <div className="screen">
+      <AmbientBackground />
       <button className="btn secondary screen-nav" onClick={() => goTo('start')}>
         ← Zurück
       </button>

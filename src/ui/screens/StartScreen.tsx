@@ -1,16 +1,42 @@
 import { useGameStore } from '../../state/gameStore'
 import { FullscreenButton } from '../components/FullscreenButton'
+import { AmbientBackground } from '../components/AmbientBackground'
 import { useFullscreen } from '../hooks/useFullscreen'
+import { AVATAR_CONFIGS, CHARACTER_ORDER } from '../../characters/avatarConfigs'
+import { achievementCoinReward, dailyChallengeDef, DAILY_CHALLENGE_BONUS_COINS, hasAchievement } from '../../game/achievements'
+import { todayKey } from '../../game/dateKey'
 
 export function StartScreen() {
   const goTo = useGameStore((s) => s.goTo)
   const openSettings = useGameStore((s) => s.openSettings)
+  const statistics = useGameStore((s) => s.statistics)
   const { isFullscreen, supported, isStandalone, isIOS } = useFullscreen()
+
+  const today = todayKey()
+  const challenge = dailyChallengeDef(today)
+  const totalReward = achievementCoinReward(challenge.id) + DAILY_CHALLENGE_BONUS_COINS
+  const completedBy = CHARACTER_ORDER.filter((id) => {
+    const stats = statistics[id]
+    return stats && hasAchievement(stats, challenge.id, today)
+  })
 
   return (
     <div className="screen">
+      <AmbientBackground />
       <img className="title-logo-img" src={`${import.meta.env.BASE_URL}icons/logo.png`} alt="Die Umwerfenden" />
       <p className="subtitle">Die originalgetreue Outdoor-Kegelbahn aus Lembeck.</p>
+      <div className="panel daily-challenge-panel">
+        <div className="daily-challenge-title">🎯 Tagesaufgabe: {challenge.title}</div>
+        <p className="subtitle" style={{ margin: 0, fontSize: '0.9rem' }}>
+          {challenge.description}
+        </p>
+        <div className="daily-challenge-reward">+{totalReward} 🪙 heute (statt sonst {achievementCoinReward(challenge.id)} 🪙)</div>
+        {completedBy.length > 0 && (
+          <div className="daily-challenge-completed">
+            Heute schon geschafft: {completedBy.map((id) => AVATAR_CONFIGS[id].name).join(', ')}
+          </div>
+        )}
+      </div>
       <button className="btn" onClick={() => goTo('playerSelect')}>
         Neues Spiel
       </button>

@@ -6,7 +6,6 @@ import { evaluateTannenbaumMood } from '../../game/moodRules'
 import { useDragShoot } from '../hooks/useDragShoot'
 import { useLeverDrag } from '../hooks/useLeverDrag'
 import { useSteerDrag } from '../hooks/useSteerDrag'
-import { AchievementBanner } from '../components/AchievementBanner'
 import { ConfettiOverlay } from '../components/ConfettiOverlay'
 import { ControlsHelp } from '../components/ControlsHelp'
 import { FullscreenButton } from '../components/FullscreenButton'
@@ -268,7 +267,6 @@ export function TannenbaumScreen() {
           </div>
         )}
 
-        <AchievementBanner />
       </div>
     </div>
   )

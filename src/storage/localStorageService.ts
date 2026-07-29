@@ -10,6 +10,7 @@ const ALLTIME_KEY = 'kegeln-lembeck:alltime:v1'
 const PIN_KEY = 'kegeln-lembeck:pins:v1'
 const COSMETICS_KEY = 'kegeln-lembeck:cosmetics:v1'
 const WEEKLY_KEY = 'kegeln-lembeck:weekly:v1'
+const LOGIN_BONUS_KEY = 'kegeln-lembeck:login-bonus:v1'
 
 /** Start-PIN jedes Charakters, bis er/sie sie einmal persönlich ändert (Teil: Charakter-PIN,
  * Vorstufe für den Kosmetik-Shop). Wie das Reset-Passwort keine echte Sicherheit, nur eine Hürde
@@ -173,4 +174,20 @@ export function saveWeeklyRecords(weekKey: string, points: Partial<Record<Charac
 
 export function resetWeeklyRecords(): void {
   localStorage.removeItem(WEEKLY_KEY)
+}
+
+/** Letztes Datum (JJJJ-MM-TT), an dem ein Charakter den Tages-Login-Bonus bereits bekommen hat
+ * (Teil: Engagement) - fehlender Eintrag bedeutet "heute noch nicht". */
+export function loadLoginBonusDates(): Partial<Record<CharacterId, string>> {
+  try {
+    const raw = localStorage.getItem(LOGIN_BONUS_KEY)
+    if (!raw) return {}
+    return JSON.parse(raw)
+  } catch {
+    return {}
+  }
+}
+
+export function saveLoginBonusDates(dates: Partial<Record<CharacterId, string>>): void {
+  localStorage.setItem(LOGIN_BONUS_KEY, JSON.stringify(dates))
 }

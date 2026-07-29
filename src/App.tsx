@@ -8,6 +8,7 @@ import { WeeklyScreen } from './ui/screens/WeeklyScreen'
 import { AllTimeScreen } from './ui/screens/AllTimeScreen'
 import { SettingsScreen } from './ui/screens/SettingsScreen'
 import { ShopSelectScreen } from './ui/screens/ShopSelectScreen'
+import { AchievementBanner } from './ui/components/AchievementBanner'
 
 // 3D-/Physik-Stack (Three.js + Rapier.js) erst laden, wenn tatsächlich gespielt wird (Teil 16.2).
 const GameScreen = lazy(() => import('./ui/screens/GameScreen').then((m) => ({ default: m.GameScreen })))
@@ -62,6 +63,7 @@ export default function App() {
   return (
     <>
       <ScreenRouter />
+      <AchievementBanner />
       <div className="orientation-warning">
         <div className="rotate-icon">📱</div>
         <h2>Bitte Gerät drehen</h2>

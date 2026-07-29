@@ -37,7 +37,14 @@ import {
   tannenbaumLeverAnimationDone,
   tannenbaumLeverPulled,
 } from '../game/tannenbaumMachine'
-import { ACHIEVEMENT_DEFS, achievementCoinReward, grantAchievement, hasAchievement } from '../game/achievements'
+import {
+  ACHIEVEMENT_DEFS,
+  achievementCoinReward,
+  dailyChallengeIdFor,
+  DAILY_CHALLENGE_BONUS_COINS,
+  grantAchievement,
+  hasAchievement,
+} from '../game/achievements'
 import { computeTotalDailyPoints, dailyWinners, emptyDailyRecord, type DailyRecords } from '../game/dailyWinner'
 import { currentWeekKey, todayKey } from '../game/dateKey'
 import { AVATAR_CONFIGS } from '../characters/avatarConfigs'
@@ -66,7 +73,7 @@ import {
   WATCH_PRICE,
   HEADBAND_PRICE,
 } from '../game/cosmetics'
-import { coinsForHausnummer, coinsForTannenbaum, WEEKLY_WINNER_COIN_BONUS } from '../game/coins'
+import { coinsForHausnummer, coinsForTannenbaum, LOGIN_BONUS_COINS, WEEKLY_WINNER_COIN_BONUS } from '../game/coins'
 import { evaluateHausnummerMood, evaluateTannenbaumMood } from '../game/moodRules'
 import {
   DEFAULT_PIN,
@@ -75,6 +82,7 @@ import {
   loadAllCosmetics,
   loadAllStatistics,
   loadAllTimeBoard,
+  loadLoginBonusDates,
   loadPins,
   loadRawDaily,
   loadRawWeekly,
@@ -87,6 +95,7 @@ import {
   saveAllStatistics,
   saveAllTimeBoard,
   saveDailyRecords,
+  saveLoginBonusDates,
   savePins,
   saveSettings,
   saveWeeklyRecords,
@@ -119,6 +128,9 @@ interface AchievementBanner {
   playerId: CharacterId
   title: string
   coins: number
+  /** 'login' zeigt einen anderen Text als ein freigeschaltetes Achievement (Teil: Engagement,
+   * Tages-Login-Bonus) - Default 'achievement', wenn weggelassen. */
+  kind?: 'achievement' | 'login'
 }
 
 interface GameStore {
@@ -140,6 +152,9 @@ interface GameStore {
    * addieren. */
   weeklyPoints: Partial<Record<CharacterId, number>>
   pins: Partial<Record<CharacterId, string>>
+  /** Letztes Datum je Charakter, an dem der Tages-Login-Bonus bereits gutgeschrieben wurde (Teil:
+   * Engagement) - siehe verifyPin. */
+  loginBonusDates: Partial<Record<CharacterId, string>>
   cosmetics: Partial<Record<CharacterId, CharacterCosmetics>>
   shopPlayer: CharacterId | null
   settings: Settings
@@ -320,6 +335,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   weekKey: initialDailyState.weekKey,
   weeklyPoints: initialDailyState.weeklyPoints,
   pins: loadPins(),
+  loginBonusDates: loadLoginBonusDates(),
   cosmetics: loadAllCosmetics(),
   shopPlayer: null,
   settings: loadSettings(),
@@ -350,7 +366,25 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   verifyPin: (id, pin) => {
     const stored = get().pins[id] ?? DEFAULT_PIN
-    return stored === pin
+    if (stored !== pin) return false
+
+    // Tages-Login-Bonus (Teil: Engagement): ein paar Münzen fürs erste erfolgreiche Einloggen an
+    // diesem Tag, unabhängig davon ob danach tatsächlich gespielt wird. verifyPin ist bewusst der
+    // gemeinsame Ort dafür, weil sowohl Spieler- als auch Shop-Auswahl darüber laufen (PinGate) -
+    // so gilt der Bonus für "heute überhaupt reingeschaut" statt nur für einen der beiden Wege.
+    const today = todayKey()
+    if (get().loginBonusDates[id] !== today) {
+      const cosmetics = addCoins(get().cosmetics, id, LOGIN_BONUS_COINS)
+      saveAllCosmetics(cosmetics)
+      const loginBonusDates = { ...get().loginBonusDates, [id]: today }
+      saveLoginBonusDates(loginBonusDates)
+      set({
+        cosmetics,
+        loginBonusDates,
+        achievementBanner: { playerId: id, title: 'Willkommen zurück', coins: LOGIN_BONUS_COINS, kind: 'login' },
+      })
+    }
+    return true
   },
 
   changePin: (id, oldPin, newPin) => {
@@ -655,9 +689,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
     let pendingAllNine = false
 
     function grantWithCoins(ps: PlayerStatistics, id: string, title: string): PlayerStatistics {
-      const coins = achievementCoinReward(id)
+      // Extra-Bonus, wenn dieses Achievement zufällig die heutige Tagesaufgabe ist (siehe
+      // dailyChallengeIdFor) - derselbe Achievement-Pool dient als Vorrat für den Rundlauf.
+      const isDailyChallenge = id === dailyChallengeIdFor(todayKey())
+      const coins = achievementCoinReward(id) + (isDailyChallenge ? DAILY_CHALLENGE_BONUS_COINS : 0)
       updatedCosmetics = addCoins(updatedCosmetics, player, coins)
-      banner = { playerId: player, title, coins }
+      banner = { playerId: player, title: isDailyChallenge ? `${title} (Tagesaufgabe!)` : title, coins }
       return grantAchievement(ps, id)
     }
 
@@ -770,9 +807,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
         if (result) {
           const player = result.playerId
           function grantWithCoins(ps: PlayerStatistics, id: string, title: string): PlayerStatistics {
-            const coins = achievementCoinReward(id)
+            const isDailyChallenge = id === dailyChallengeIdFor(todayKey())
+            const coins = achievementCoinReward(id) + (isDailyChallenge ? DAILY_CHALLENGE_BONUS_COINS : 0)
             updatedCosmetics = addCoins(updatedCosmetics, player, coins)
-            banner = { playerId: player, title, coins }
+            banner = { playerId: player, title: isDailyChallenge ? `${title} (Tagesaufgabe!)` : title, coins }
             return grantAchievement(ps, id)
           }
 
@@ -893,9 +931,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
       updatedCosmetics = addCoins(updatedCosmetics, player, gameCoins)
 
       if (dayRec.gamesPlayedToday >= 5 && !hasAchievement(ps, 'stammgast', todayKey())) {
-        const achCoins = achievementCoinReward('stammgast')
+        const isDailyChallenge = dailyChallengeIdFor(todayKey()) === 'stammgast'
+        const achCoins = achievementCoinReward('stammgast') + (isDailyChallenge ? DAILY_CHALLENGE_BONUS_COINS : 0)
         updatedCosmetics = addCoins(updatedCosmetics, player, achCoins)
-        banner = { playerId: player, title: 'Stammgast', coins: achCoins }
+        banner = { playerId: player, title: isDailyChallenge ? 'Stammgast (Tagesaufgabe!)' : 'Stammgast', coins: achCoins }
         ps = grantAchievement(ps, 'stammgast')
       }
       const updatedStats = { ...statistics, [player]: ps }
@@ -944,7 +983,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   resetTodayOnly: () => {
     resetDailyRecords()
-    set({ dailyRecords: {} })
+    saveLoginBonusDates({})
+    set({ dailyRecords: {}, loginBonusDates: {} })
   },
 
   resetStatistics: () => {
@@ -952,12 +992,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
     resetDailyRecords()
     resetAllTimeBoard()
     resetWeeklyRecords()
+    saveLoginBonusDates({})
     set({
       statistics: {} as Record<CharacterId, PlayerStatistics>,
       dailyRecords: {},
       allTimeBoard: {},
       weekKey: currentWeekKey(),
       weeklyPoints: {},
+      loginBonusDates: {},
     })
   },
 

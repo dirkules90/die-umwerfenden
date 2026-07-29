@@ -45,3 +45,8 @@ export function coinsForTannenbaum(throwCount: number): number {
 /** Einmaliger Bonus für den/die Wochensieger einer vollständig abgeschlossenen Kalenderwoche,
  * bei Gleichstand anteilig aufgeteilt (wie schon beim Tagessieger-Punkt in der Allzeit-Liste). */
 export const WEEKLY_WINNER_COIN_BONUS = 120
+
+/** Kleiner Bonus fürs erste erfolgreiche PIN-Einloggen an einem Tag (Teil: Engagement) -
+ * unabhängig davon, ob danach tatsächlich gespielt wird: schon das "kurz reinschauen" lohnt sich
+ * ein bisschen, ohne die Haupt-Ökonomie (Partien, Achievements) zu verwässern. */
+export const LOGIN_BONUS_COINS = 5

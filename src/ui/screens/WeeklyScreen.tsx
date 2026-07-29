@@ -5,6 +5,7 @@ import { mondayOfWeek, todayKey } from '../../game/dateKey'
 import { WEEKLY_WINNER_COIN_BONUS } from '../../game/coins'
 import { formatPoints } from '../formatPoints'
 import { LeaderboardTabs } from '../components/LeaderboardTabs'
+import { AmbientBackground } from '../components/AmbientBackground'
 import type { CharacterId } from '../../game/types'
 
 const WEEKDAY_LABELS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
@@ -39,6 +40,7 @@ export function WeeklyScreen() {
 
   return (
     <div className="screen">
+      <AmbientBackground />
       <button className="btn secondary screen-nav" onClick={() => goTo('start')}>
         ← Zurück
       </button>

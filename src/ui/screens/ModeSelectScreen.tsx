@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useGameStore } from '../../state/gameStore'
 import { ControlsHelp } from '../components/ControlsHelp'
+import { AmbientBackground } from '../components/AmbientBackground'
 import type { GameMode } from '../../game/types'
 
 type SelectableMode = GameMode | 'tannenbaum'
@@ -18,6 +19,7 @@ export function ModeSelectScreen() {
 
   return (
     <div className="screen">
+      <AmbientBackground />
       <button className="btn secondary screen-nav" onClick={() => goTo('playerSelect')}>
         ← Zurück
       </button>

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useGameStore } from '../../state/gameStore'
+import { AmbientBackground } from '../components/AmbientBackground'
 
 const REPO_URL = 'https://github.com/dirkules90/die-umwerfenden'
 const APP_VERSION = '1.0.0'
@@ -44,6 +45,7 @@ export function SettingsScreen() {
 
   return (
     <div className="screen">
+      <AmbientBackground />
       <button className="btn secondary screen-nav" onClick={close}>
         ← Zurück
       </button>

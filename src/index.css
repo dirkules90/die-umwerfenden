@@ -514,8 +514,11 @@ h3 {
 }
 
 .achievement-banner {
-  position: absolute;
-  top: 1rem;
+  /* Fixed statt absolute (Teil: Engagement) - läuft jetzt global in App.tsx statt nur innerhalb
+     der Spiel-Bildschirme, muss also unabhängig von einem positionierten Vorfahren funktionieren
+     (z.B. für den Tages-Login-Bonus, der schon in der Spielerauswahl ausgelöst wird). */
+  position: fixed;
+  top: env(safe-area-inset-top, 1rem);
   left: 50%;
   transform: translateX(-50%);
   background: linear-gradient(90deg, #f4d03f, #f1c40f);
@@ -525,6 +528,7 @@ h3 {
   font-weight: 800;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
   z-index: 50;
+  pointer-events: none;
   animation: banner-pop 0.3s ease;
 }
 
@@ -886,4 +890,95 @@ h3 {
   border-radius: 10px;
   padding: 0.2rem;
   background: rgba(255, 255, 255, 0.1);
+}
+
+/* Ambient-Hintergrund für Menüs (Teil: UI-Modernisierung) - siehe AmbientBackground.tsx. Liegt als
+   erstes Kind flach hinter dem restlichen .screen-Inhalt, ohne dessen Flex-Layout zu beeinflussen
+   (position: absolute nimmt es aus dem Fluss). */
+.ambient-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ambient-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(50px);
+  will-change: transform;
+}
+
+.ambient-blob-a {
+  width: 22rem;
+  height: 22rem;
+  left: -6rem;
+  top: -5rem;
+  background: radial-gradient(circle, var(--wiesengruen), transparent 70%);
+  opacity: 0.35;
+  animation: ambient-drift-a 26s ease-in-out infinite;
+}
+
+.ambient-blob-b {
+  width: 18rem;
+  height: 18rem;
+  right: -5rem;
+  top: 25%;
+  background: radial-gradient(circle, var(--himmelblau), transparent 70%);
+  opacity: 0.4;
+  animation: ambient-drift-b 32s ease-in-out infinite;
+}
+
+.ambient-blob-c {
+  width: 16rem;
+  height: 16rem;
+  left: 28%;
+  bottom: -7rem;
+  background: radial-gradient(circle, #f4d03f, transparent 70%);
+  opacity: 0.25;
+  animation: ambient-drift-c 38s ease-in-out infinite;
+}
+
+@keyframes ambient-drift-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(4rem, 3rem) scale(1.15); }
+}
+
+@keyframes ambient-drift-b {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-3rem, -2.5rem) scale(1.1); }
+}
+
+@keyframes ambient-drift-c {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(2.5rem, -3rem) scale(1.2); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ambient-blob {
+    animation: none;
+  }
+}
+
+/* Tagesaufgabe (Teil: Engagement) - Panel auf dem Startbildschirm. */
+.daily-challenge-panel {
+  max-width: 26rem;
+  text-align: left;
+}
+
+.daily-challenge-title {
+  font-weight: 800;
+  margin-bottom: 0.3rem;
+}
+
+.daily-challenge-reward {
+  color: #ffd75e;
+  font-weight: 700;
+  margin-top: 0.4rem;
+}
+
+.daily-challenge-completed {
+  font-size: 0.8rem;
+  opacity: 0.8;
+  margin-top: 0.3rem;
 }

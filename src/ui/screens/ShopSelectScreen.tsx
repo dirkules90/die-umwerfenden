@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useGameStore } from '../../state/gameStore'
 import { AVATAR_CONFIGS, CHARACTER_ORDER } from '../../characters/avatarConfigs'
 import { PinGate } from '../components/PinGate'
+import { AmbientBackground } from '../components/AmbientBackground'
 import type { CharacterId } from '../../game/types'
 
 /** Charakterauswahl vor dem Shop (Teil: Kosmetik-Shop) - eigener Screen statt Wiederverwendung
@@ -15,6 +16,7 @@ export function ShopSelectScreen() {
 
   return (
     <div className="screen">
+      <AmbientBackground />
       <button className="btn secondary screen-nav" onClick={() => goTo('start')}>
         ← Zurück
       </button>

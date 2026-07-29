@@ -7,6 +7,7 @@ import { ACHIEVEMENT_DEFS, hasAchievement } from '../../game/achievements'
 import { emptyStatistics } from '../../storage/localStorageService'
 import { formatPoints } from '../formatPoints'
 import { LeaderboardTabs } from '../components/LeaderboardTabs'
+import { AmbientBackground } from '../components/AmbientBackground'
 import type { CharacterId } from '../../game/types'
 
 export function LeaderboardScreen() {
@@ -34,6 +35,7 @@ export function LeaderboardScreen() {
 
   return (
     <div className="screen">
+      <AmbientBackground />
       <button className="btn secondary screen-nav" onClick={() => goTo('start')}>
         ← Zurück
       </button>
