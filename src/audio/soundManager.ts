@@ -257,6 +257,22 @@ class SoundManager {
     this.tone(300, 0.4, { type: 'sine', freqEnd: 170, gain: 0.16 })
   }
 
+  /** Kurzes, helles "Cling" für jeden Münzenerhalt (Teil: Engagement) - bewusst sehr kurz/leise,
+   * weil es an vielen verschiedenen Stellen läuft (Partie-Ende, Achievement, Login-Bonus) und
+   * dabei manchmal direkt neben einer größeren Fanfare (playVictory/playAllNine) klingt. */
+  playCoinGain() {
+    ;[1175, 1568].forEach((f, i) => window.setTimeout(() => this.tone(f, 0.12, { type: 'triangle', gain: 0.14 }), i * 55))
+  }
+
+  /** Funkelndes Auf-Arpeggio für die seltene Überraschungsbelohnung (Teil: Engagement) - deutlich
+   * auffälliger als playCoinGain, damit der Zufallsmoment auch wirklich als etwas Besonderes
+   * aus dem normalen Münz-Feedback heraussticht. */
+  playSurpriseBonus() {
+    ;[784, 988, 1175, 1568].forEach((f, i) =>
+      window.setTimeout(() => this.tone(f, 0.18, { type: 'triangle', gain: 0.2 }), i * 70),
+    )
+  }
+
   startAmbientLoop() {
     const ctx = this.ensureContext()
     if (this.ambientSource) return

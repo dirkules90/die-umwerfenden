@@ -31,6 +31,8 @@ export function emptyStatistics(): PlayerStatistics {
     gutterThrows: 0,
     longestPerfectStreak: 0,
     achievements: [],
+    currentStreak: 0,
+    lastPlayedDate: null,
   }
 }
 

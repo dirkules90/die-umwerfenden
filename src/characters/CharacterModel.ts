@@ -175,6 +175,12 @@ export class CharacterModel {
   private state: CharacterAnimState = 'idle'
   private stateElapsed = 0
   private backswingAmount = 0
+  // Idle-Politur (Teil: UI-Politur): gelegentliches kurzes Blinzeln statt einer komplett
+  // reglosen Ruhehaltung. Zufälliges Intervall statt eines festen Takts, damit es nicht
+  // mechanisch wirkt.
+  private blinkTimer = 2 + Math.random() * 4
+  private isBlinking = false
+  private blinkElapsed = 0
 
   constructor(config: AvatarConfig, cosmetics: CosmeticLoadout) {
     const scale = BUILD_SCALE[config.build]
@@ -353,6 +359,7 @@ export class CharacterModel {
       happy: buildFaceTexture('happy', config.skinColor),
       meh: buildFaceTexture('meh', config.skinColor),
       sad: buildFaceTexture('sad', config.skinColor),
+      blink: buildFaceTexture('blink', config.skinColor),
     }
     const faceMat = new THREE.MeshStandardMaterial({ map: this.faceTextures.neutral, roughness: 0.75 })
     const facePhiWidth = 1.25
@@ -691,6 +698,27 @@ export class CharacterModel {
         this.leftArmPivot.rotation.x = droop * 0.35
         this.rightArmPivot.rotation.x = droop * 0.35
         break
+      }
+    }
+
+    // Idle-Blinzeln (Teil: UI-Politur) - nur in echter Ruhehaltung, damit ein Blinzeln nicht
+    // mitten in eine Wurf-/Reaktionsanimation hineinplatzt und die dortige Stimmungstextur
+    // überschreibt.
+    if (this.state === 'idle') {
+      if (this.isBlinking) {
+        this.blinkElapsed += dt
+        if (this.blinkElapsed > 0.12) {
+          this.isBlinking = false
+          this.blinkTimer = 2.5 + Math.random() * 3.5
+          this.applyMood('neutral')
+        }
+      } else {
+        this.blinkTimer -= dt
+        if (this.blinkTimer <= 0) {
+          this.isBlinking = true
+          this.blinkElapsed = 0
+          this.applyMood('blink')
+        }
       }
     }
   }

@@ -50,3 +50,18 @@ export const WEEKLY_WINNER_COIN_BONUS = 120
  * unabhängig davon, ob danach tatsächlich gespielt wird: schon das "kurz reinschauen" lohnt sich
  * ein bisschen, ohne die Haupt-Ökonomie (Partien, Achievements) zu verwässern. */
 export const LOGIN_BONUS_COINS = 5
+
+/** Variable Überraschungsbelohnung (Teil: Engagement) - eine geringe, zufällige Chance pro Wurf
+ * auf ein paar Extra-Münzen, unabhängig vom Wurfergebnis. Bewusst nicht deterministisch: variable
+ * statt vorhersehbare Belohnungen erzeugen mehr Vorfreude als eine reine Punkte-Formel. Nur EIN
+ * Bonus pro Wurf und nur, wenn in diesem Wurf nicht schon ein Achievement-Banner ausgelöst wurde
+ * (siehe gameStore.ts) - sonst würden sich zwei Banner überschreiben. */
+export const SURPRISE_BONUS_CHANCE = 0.08
+const SURPRISE_BONUS_MIN = 3
+const SURPRISE_BONUS_MAX = 8
+
+/** null = kein Bonus diesmal (der weit überwiegende Fall). */
+export function rollSurpriseBonus(): number | null {
+  if (Math.random() >= SURPRISE_BONUS_CHANCE) return null
+  return SURPRISE_BONUS_MIN + Math.floor(Math.random() * (SURPRISE_BONUS_MAX - SURPRISE_BONUS_MIN + 1))
+}

@@ -9,6 +9,7 @@ import { AllTimeScreen } from './ui/screens/AllTimeScreen'
 import { SettingsScreen } from './ui/screens/SettingsScreen'
 import { ShopSelectScreen } from './ui/screens/ShopSelectScreen'
 import { AchievementBanner } from './ui/components/AchievementBanner'
+import { LoadingScreen } from './ui/components/LoadingScreen'
 
 // 3D-/Physik-Stack (Three.js + Rapier.js) erst laden, wenn tatsächlich gespielt wird (Teil 16.2).
 const GameScreen = lazy(() => import('./ui/screens/GameScreen').then((m) => ({ default: m.GameScreen })))
@@ -28,13 +29,13 @@ function ScreenRouter() {
       return <ModeSelectScreen />
     case 'game':
       return (
-        <Suspense fallback={<div className="screen">Lade Kegelbahn…</div>}>
+        <Suspense fallback={<LoadingScreen label="Lade Kegelbahn…" />}>
           <GameScreen />
         </Suspense>
       )
     case 'tannenbaum':
       return (
-        <Suspense fallback={<div className="screen">Lade Kegelbahn…</div>}>
+        <Suspense fallback={<LoadingScreen label="Lade Kegelbahn…" />}>
           <TannenbaumScreen />
         </Suspense>
       )
@@ -50,7 +51,7 @@ function ScreenRouter() {
       return <ShopSelectScreen />
     case 'shop':
       return (
-        <Suspense fallback={<div className="screen">Lade Shop…</div>}>
+        <Suspense fallback={<LoadingScreen label="Lade Shop…" />}>
           <ShopScreen />
         </Suspense>
       )

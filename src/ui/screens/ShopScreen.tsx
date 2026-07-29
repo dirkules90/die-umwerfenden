@@ -32,9 +32,11 @@ import {
   isShoeColorOwned,
   isWristbandOwned,
   necklacePrice,
+  ownedItemCount,
   pantsColorPrice,
   shirtStylePrice,
   shoeColorPrice,
+  totalPurchasableItemCount,
   wristbandPrice,
 } from '../../game/cosmetics'
 import type {
@@ -83,6 +85,8 @@ export function ShopScreen() {
   const config = AVATAR_CONFIGS[effectiveId]
   const { coins, loadout, ownership } = cosmeticsFor(cosmetics, effectiveId)
   const [draft, setDraft] = useState<CosmeticLoadout>(loadout)
+  const ownedCount = ownedItemCount(ownership, config)
+  const totalCount = totalPurchasableItemCount()
 
   useEffect(() => {
     if (!shopPlayer) goTo('shopSelect')
@@ -238,6 +242,15 @@ export function ShopScreen() {
       <p className="subtitle" style={{ maxWidth: '30rem' }}>
         Münzen gibt es fürs Spielen, für Achievements und für den Wochensieg.
       </p>
+
+      <div className="shop-progress-panel">
+        <div className="shop-progress-label">
+          🎁 Sammelfortschritt: {ownedCount} von {totalCount} Items
+        </div>
+        <div className="shop-progress-bar">
+          <div className="shop-progress-fill" style={{ width: `${(ownedCount / totalCount) * 100}%` }} />
+        </div>
+      </div>
 
       <div className="shop-layout">
         <div className="shop-preview-wrap" ref={containerRef}>

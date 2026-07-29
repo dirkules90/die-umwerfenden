@@ -8,6 +8,7 @@ export function PlayerSelectScreen() {
   const selectedPlayer = useGameStore((s) => s.selectedPlayer)
   const selectPlayer = useGameStore((s) => s.selectPlayer)
   const goTo = useGameStore((s) => s.goTo)
+  const statistics = useGameStore((s) => s.statistics)
   const [pinGateOpen, setPinGateOpen] = useState(false)
 
   return (
@@ -22,6 +23,9 @@ export function PlayerSelectScreen() {
         {CHARACTER_ORDER.map((id) => {
           const config = AVATAR_CONFIGS[id]
           const selected = selectedPlayer === id
+          // Streak-Badge (Teil: Engagement) - erst ab 2 Tagen gezeigt, damit ein frisch gestartetes
+          // "🔥1" nicht wie Grundrauschen für jeden aussieht, der heute zum ersten Mal spielt.
+          const streak = statistics[id]?.currentStreak ?? 0
           return (
             <button
               key={id}
@@ -30,6 +34,7 @@ export function PlayerSelectScreen() {
             >
               <img src={config.photoUrl} alt={config.name} />
               <span className="name">{config.name}</span>
+              {streak >= 2 && <span className="streak-badge">🔥{streak}</span>}
             </button>
           )
         })}

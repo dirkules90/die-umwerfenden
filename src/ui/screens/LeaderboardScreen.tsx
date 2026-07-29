@@ -113,6 +113,10 @@ export function LeaderboardScreen() {
               <td>{detailStats.gamesPlayed}</td>
             </tr>
             <tr>
+              <td>Serie (Tage in Folge gespielt)</td>
+              <td>{detailStats.currentStreak > 0 ? `🔥 ${detailStats.currentStreak}` : '–'}</td>
+            </tr>
+            <tr>
               <td>Bester Wert „Hohe Hausnummer”</td>
               <td>{detailStats.bestHigh !== null ? String(detailStats.bestHigh).padStart(3, '0') : '–'}</td>
             </tr>

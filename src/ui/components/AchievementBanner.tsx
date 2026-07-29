@@ -18,6 +18,8 @@ export function AchievementBanner() {
     <div className="achievement-banner">
       {banner.kind === 'login' ? (
         <>👋 {AVATAR_CONFIGS[banner.playerId].name}: Schön, dass du da bist! (+{banner.coins} 🪙)</>
+      ) : banner.kind === 'surprise' ? (
+        <>✨ {AVATAR_CONFIGS[banner.playerId].name}: Überraschungsbonus! (+{banner.coins} 🪙)</>
       ) : (
         <>
           🏆 {AVATAR_CONFIGS[banner.playerId].name}: „{banner.title}” freigeschaltet! (+{banner.coins} 🪙)

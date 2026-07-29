@@ -1,4 +1,6 @@
-export type Mood = 'neutral' | 'happy' | 'meh' | 'sad'
+/** 'blink' ist keine echte Stimmung, sondern ein kurzer Augenschluss-Frame für die Idle-Animation
+ * (Teil: UI-Politur, siehe CharacterModel.update) - macht die Figur in Ruhehaltung lebendiger. */
+export type Mood = 'neutral' | 'happy' | 'meh' | 'sad' | 'blink'
 
 /**
  * Bemaltes Mii-artiges Gesicht (Teil: Charaktermodell-Überarbeitung, Vorbild Wii-Bowling-Mii) - wird
@@ -40,6 +42,18 @@ export function drawFace(ctx: CanvasRenderingContext2D, mood: Mood, skinColor: s
     for (const x of [leftX, rightX]) {
       ctx.beginPath()
       ctx.arc(x, eyeY + 14 * s, 22 * s, Math.PI, Math.PI * 2)
+      ctx.stroke()
+    }
+  } else if (mood === 'blink') {
+    // Kurzer, flacher Strich statt der offenen Augäpfel - simuliert den Sekundenbruchteil eines
+    // Lidschlags in der Idle-Animation, ohne eine eigene fünfte Grundstimmung zu behaupten.
+    ctx.strokeStyle = ink
+    ctx.lineWidth = 6 * s
+    ctx.lineCap = 'round'
+    for (const x of [leftX, rightX]) {
+      ctx.beginPath()
+      ctx.moveTo(x - 20 * s, eyeY)
+      ctx.lineTo(x + 20 * s, eyeY)
       ctx.stroke()
     }
   } else {

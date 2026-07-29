@@ -26,3 +26,13 @@ export function weekKeyFor(date: Date): string {
 export function currentWeekKey(): string {
   return weekKeyFor(new Date())
 }
+
+/** Prüft, ob `dateKey` genau der Kalendertag nach `prevDateKey` ist (Teil: Spiel-Streak) - über
+ * UTC-Millisekunden statt Date-Arithmetik mit lokalen Zeitzonenverschiebungen/Sommerzeit. */
+export function isNextDay(prevDateKey: string, dateKey: string): boolean {
+  const [py, pm, pd] = prevDateKey.split('-').map(Number)
+  const [y, m, d] = dateKey.split('-').map(Number)
+  const prevMs = Date.UTC(py, pm - 1, pd)
+  const curMs = Date.UTC(y, m - 1, d)
+  return curMs - prevMs === 86_400_000
+}

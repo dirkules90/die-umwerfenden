@@ -46,7 +46,7 @@ import {
   hasAchievement,
 } from '../game/achievements'
 import { computeTotalDailyPoints, dailyWinners, emptyDailyRecord, type DailyRecords } from '../game/dailyWinner'
-import { currentWeekKey, todayKey } from '../game/dateKey'
+import { currentWeekKey, isNextDay, todayKey } from '../game/dateKey'
 import { AVATAR_CONFIGS } from '../characters/avatarConfigs'
 import {
   hairStylePrice,
@@ -73,7 +73,13 @@ import {
   WATCH_PRICE,
   HEADBAND_PRICE,
 } from '../game/cosmetics'
-import { coinsForHausnummer, coinsForTannenbaum, LOGIN_BONUS_COINS, WEEKLY_WINNER_COIN_BONUS } from '../game/coins'
+import {
+  coinsForHausnummer,
+  coinsForTannenbaum,
+  LOGIN_BONUS_COINS,
+  rollSurpriseBonus,
+  WEEKLY_WINNER_COIN_BONUS,
+} from '../game/coins'
 import { evaluateHausnummerMood, evaluateTannenbaumMood } from '../game/moodRules'
 import {
   DEFAULT_PIN,
@@ -128,9 +134,10 @@ interface AchievementBanner {
   playerId: CharacterId
   title: string
   coins: number
-  /** 'login' zeigt einen anderen Text als ein freigeschaltetes Achievement (Teil: Engagement,
-   * Tages-Login-Bonus) - Default 'achievement', wenn weggelassen. */
-  kind?: 'achievement' | 'login'
+  /** 'login'/'surprise' zeigen einen anderen Text als ein freigeschaltetes Achievement (Teil:
+   * Engagement - Tages-Login-Bonus bzw. Überraschungsbonus) - Default 'achievement', wenn
+   * weggelassen. */
+  kind?: 'achievement' | 'login' | 'surprise'
 }
 
 interface GameStore {
@@ -239,6 +246,17 @@ function addCoins(
   if (amount <= 0) return cosmeticsMap
   const current = cosmeticsFor(cosmeticsMap, id)
   return { ...cosmeticsMap, [id]: { ...current, coins: current.coins + amount } }
+}
+
+/** Aktualisiert currentStreak/lastPlayedDate anhand des heutigen Datums (Teil: Engagement/Streak) -
+ * aufgerufen einmal pro abgeschlossener Partie. Mehrere Partien am selben Tag zählen nur einmal
+ * (lastPlayedDate ist bereits heute, also unverändert); ein Tag Pause setzt die Serie zurück auf 1
+ * statt auf 0, weil der heutige Tag selbst ja gerade gespielt wird. */
+function updateStreak(ps: PlayerStatistics): PlayerStatistics {
+  const today = todayKey()
+  if (ps.lastPlayedDate === today) return ps
+  const currentStreak = ps.lastPlayedDate && isNextDay(ps.lastPlayedDate, today) ? ps.currentStreak + 1 : 1
+  return { ...ps, currentStreak, lastPlayedDate: today }
 }
 
 /** Exklusive Wochensieger-Krone (Teil: Shop-Erweiterung) - nicht käuflich, wird nur hier beim
@@ -378,6 +396,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       saveAllCosmetics(cosmetics)
       const loginBonusDates = { ...get().loginBonusDates, [id]: today }
       saveLoginBonusDates(loginBonusDates)
+      soundManager.playCoinGain()
       set({
         cosmetics,
         loginBonusDates,
@@ -695,6 +714,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const coins = achievementCoinReward(id) + (isDailyChallenge ? DAILY_CHALLENGE_BONUS_COINS : 0)
       updatedCosmetics = addCoins(updatedCosmetics, player, coins)
       banner = { playerId: player, title: isDailyChallenge ? `${title} (Tagesaufgabe!)` : title, coins }
+      soundManager.playCoinGain()
       return grantAchievement(ps, id)
     }
 
@@ -745,6 +765,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
           ps = grantWithCoins(ps, 'bahnrand-kenner', 'Bahnrand-Kenner')
         }
         updatedStats = { ...updatedStats, [player]: ps }
+      }
+    }
+
+    // Variable Überraschungsbelohnung (Teil: Engagement) - nur wenn dieser Wurf nicht schon ein
+    // Achievement-Banner ausgelöst hat, sonst würden sich zwei Banner überschreiben.
+    if (!banner) {
+      const surpriseBonus = rollSurpriseBonus()
+      if (surpriseBonus !== null) {
+        updatedCosmetics = addCoins(updatedCosmetics, player, surpriseBonus)
+        banner = { playerId: player, title: 'Überraschungsbonus', coins: surpriseBonus, kind: 'surprise' }
+        soundManager.playSurpriseBonus()
       }
     }
 
@@ -811,12 +842,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
             const coins = achievementCoinReward(id) + (isDailyChallenge ? DAILY_CHALLENGE_BONUS_COINS : 0)
             updatedCosmetics = addCoins(updatedCosmetics, player, coins)
             banner = { playerId: player, title: isDailyChallenge ? `${title} (Tagesaufgabe!)` : title, coins }
+            window.setTimeout(() => soundManager.playCoinGain(), 250)
             return grantAchievement(ps, id)
           }
 
           let ps = statsFor(updatedStats, player)
           const v = result.houseNumber
           ps = { ...ps, gamesPlayed: ps.gamesPlayed + 1 }
+          ps = updateStreak(ps)
           if (next.mode === 'hoch') {
             ps = {
               ...ps,
@@ -845,6 +878,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
           gameCoins = coinsForHausnummer(next.mode, v)
           updatedCosmetics = addCoins(updatedCosmetics, player, gameCoins)
+          window.setTimeout(() => soundManager.playCoinGain(), 250)
 
           // Stammgast/Tiefstapler bewusst auf Tageswerten statt Lebenszeit-Rekorden: so bleiben
           // sie wie die übrigen Achievements an jedem neuen Tag wieder frisch erreichbar, statt
@@ -920,6 +954,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       let ps = statsFor(statistics, player)
       const isBest = ps.bestTannenbaum === null || throwCount < ps.bestTannenbaum
       ps = { ...ps, bestTannenbaum: isBest ? throwCount : ps.bestTannenbaum, gamesPlayed: ps.gamesPlayed + 1 }
+      ps = updateStreak(ps)
 
       const dayRec = { ...emptyDailyRecord(), ...dailyRecords[player] }
       dayRec.bestTannenbaum = dayRec.bestTannenbaum === null ? throwCount : Math.min(dayRec.bestTannenbaum, throwCount)
@@ -929,12 +964,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
       const gameCoins = coinsForTannenbaum(throwCount)
       updatedCosmetics = addCoins(updatedCosmetics, player, gameCoins)
+      window.setTimeout(() => soundManager.playCoinGain(), 250)
 
       if (dayRec.gamesPlayedToday >= 5 && !hasAchievement(ps, 'stammgast', todayKey())) {
         const isDailyChallenge = dailyChallengeIdFor(todayKey()) === 'stammgast'
         const achCoins = achievementCoinReward('stammgast') + (isDailyChallenge ? DAILY_CHALLENGE_BONUS_COINS : 0)
         updatedCosmetics = addCoins(updatedCosmetics, player, achCoins)
         banner = { playerId: player, title: isDailyChallenge ? 'Stammgast (Tagesaufgabe!)' : 'Stammgast', coins: achCoins }
+        window.setTimeout(() => soundManager.playCoinGain(), 400)
         ps = grantAchievement(ps, 'stammgast')
       }
       const updatedStats = { ...statistics, [player]: ps }
@@ -952,7 +989,21 @@ export const useGameStore = create<GameStore>((set, get) => ({
         achievementBanner: banner ?? get().achievementBanner,
       })
     } else {
-      set({ tannenbaumSession: next })
+      // Variable Überraschungsbelohnung (Teil: Engagement) - auch bei laufenden Tannenbaum-Partien,
+      // nicht nur bei Hausnummer-Würfen.
+      const surpriseBonus = rollSurpriseBonus()
+      if (surpriseBonus !== null) {
+        const updatedCosmetics = addCoins(cosmetics, tannenbaumSession.playerId, surpriseBonus)
+        saveAllCosmetics(updatedCosmetics)
+        soundManager.playSurpriseBonus()
+        set({
+          tannenbaumSession: next,
+          cosmetics: updatedCosmetics,
+          achievementBanner: { playerId: tannenbaumSession.playerId, title: 'Überraschungsbonus', coins: surpriseBonus, kind: 'surprise' },
+        })
+      } else {
+        set({ tannenbaumSession: next })
+      }
     }
   },
 

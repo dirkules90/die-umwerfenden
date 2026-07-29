@@ -115,6 +115,11 @@ export interface PlayerStatistics {
   gutterThrows: number
   longestPerfectStreak: number
   achievements: Achievement[]
+  /** Anzahl aufeinanderfolgender Kalendertage, an denen mindestens eine Partie beendet wurde
+   * (Teil: Engagement/Streak) - siehe state/gameStore.ts updateStreak. */
+  currentStreak: number
+  /** Letzter Tag (JJJJ-MM-TT), an dem eine Partie beendet wurde - Grundlage für currentStreak. */
+  lastPlayedDate: string | null
 }
 
 export interface Settings {
