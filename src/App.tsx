@@ -4,6 +4,7 @@ import { StartScreen } from './ui/screens/StartScreen'
 import { PlayerSelectScreen } from './ui/screens/PlayerSelectScreen'
 import { ModeSelectScreen } from './ui/screens/ModeSelectScreen'
 import { LeaderboardScreen } from './ui/screens/LeaderboardScreen'
+import { WeeklyScreen } from './ui/screens/WeeklyScreen'
 import { AllTimeScreen } from './ui/screens/AllTimeScreen'
 import { SettingsScreen } from './ui/screens/SettingsScreen'
 import { ShopSelectScreen } from './ui/screens/ShopSelectScreen'
@@ -38,6 +39,8 @@ function ScreenRouter() {
       )
     case 'leaderboard':
       return <LeaderboardScreen />
+    case 'weekly':
+      return <WeeklyScreen />
     case 'allTime':
       return <AllTimeScreen />
     case 'settings':

@@ -1,6 +1,7 @@
 import { useGameStore } from '../../state/gameStore'
 import { AVATAR_CONFIGS, CHARACTER_ORDER } from '../../characters/avatarConfigs'
 import { formatPoints } from '../formatPoints'
+import { LeaderboardTabs } from '../components/LeaderboardTabs'
 
 export function AllTimeScreen() {
   const allTimeBoard = useGameStore((s) => s.allTimeBoard)
@@ -12,10 +13,11 @@ export function AllTimeScreen() {
 
   return (
     <div className="screen">
-      <button className="btn secondary screen-nav" onClick={() => goTo('leaderboard')}>
+      <button className="btn secondary screen-nav" onClick={() => goTo('start')}>
         ← Zurück
       </button>
       <h2 style={{ margin: 0 }}>Allzeit-Bestenliste</h2>
+      <LeaderboardTabs active="allTime" />
       <p className="subtitle" style={{ maxWidth: '32rem' }}>
         Für jeden abgeschlossenen Tag bekommt der/die Tagessieger 1 Punkt (bei Gleichstand aufgeteilt). Diese Liste
         summiert die Tagessiege über alle Tage.

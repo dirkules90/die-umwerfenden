@@ -46,6 +46,7 @@ import {
   HEADBAND_PRICE,
 } from '../game/cosmetics'
 import { coinsForHausnummer, coinsForTannenbaum, WEEKLY_WINNER_COIN_BONUS } from '../game/coins'
+import { evaluateHausnummerMood, evaluateTannenbaumMood } from '../game/moodRules'
 import {
   DEFAULT_PIN,
   emptyCosmetics,
@@ -79,6 +80,7 @@ export type Screen =
   | 'game'
   | 'tannenbaum'
   | 'leaderboard'
+  | 'weekly'
   | 'allTime'
   | 'settings'
   | 'shopSelect'
@@ -107,6 +109,15 @@ interface GameStore {
   statistics: Record<CharacterId, PlayerStatistics>
   dailyRecords: DailyRecords
   allTimeBoard: Partial<Record<CharacterId, number>>
+  /** Woche, für die weeklyPoints gerade gesammelt werden (Montag der Woche, siehe game/dateKey.ts) -
+   * Teil: Wochen-Bestenliste, damit die UI die aktuelle Wochen-Spanne anzeigen kann. */
+  weekKey: string
+  /** Punkte bereits abgeschlossener Tage DIESER Woche (Teil: Wochen-Bestenliste) - der heutige,
+   * noch laufende Tag ist hier bewusst NICHT enthalten (fließt erst beim nächsten App-Start beim
+   * Tagesabschluss ein, siehe processDailyAndWeeklyRollover). Für eine live vollständige
+   * Wochensumme müssen UI-Screens dies mit computeTotalDailyPoints(dailyRecords, ..., todayKey())
+   * addieren. */
+  weeklyPoints: Partial<Record<CharacterId, number>>
   pins: Partial<Record<CharacterId, string>>
   cosmetics: Partial<Record<CharacterId, CharacterCosmetics>>
   shopPlayer: CharacterId | null
@@ -204,6 +215,8 @@ function processDailyAndWeeklyRollover(): {
   statistics: Record<CharacterId, PlayerStatistics>
   dailyRecords: DailyRecords
   allTimeBoard: Partial<Record<CharacterId, number>>
+  weekKey: string
+  weeklyPoints: Partial<Record<CharacterId, number>>
 } {
   const statistics = loadAllStatistics()
   let allTimeBoard = loadAllTimeBoard()
@@ -246,7 +259,7 @@ function processDailyAndWeeklyRollover(): {
   }
 
   saveWeeklyRecords(weekKey, weeklyPoints)
-  return { statistics, dailyRecords, allTimeBoard }
+  return { statistics, dailyRecords, allTimeBoard, weekKey, weeklyPoints }
 }
 
 const initialDailyState = processDailyAndWeeklyRollover()
@@ -260,6 +273,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   statistics: initialDailyState.statistics,
   dailyRecords: initialDailyState.dailyRecords,
   allTimeBoard: initialDailyState.allTimeBoard,
+  weekKey: initialDailyState.weekKey,
+  weeklyPoints: initialDailyState.weeklyPoints,
   pins: loadPins(),
   cosmetics: loadAllCosmetics(),
   shopPlayer: null,
@@ -463,6 +478,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
       soundManager.playPinsFall(pinsDown)
     }
 
+    // Stimmungs-Sound (Teil: Reaktions-Mimik) - Alle-Neune hat mit playAllNine() bereits seine
+    // eigene, größere Fanfare weiter unten, daher hier ausgenommen. Kurze Verzögerung, damit der
+    // Ton nicht direkt mit dem Kegel-/Rinnengeräusch kollidiert.
+    if (!(pinsDown === 9 && !isGutter)) {
+      const mood = evaluateHausnummerMood(session.mode, pinsDown, isGutter)
+      window.setTimeout(() => {
+        if (mood === 'happy') soundManager.playMoodHappy()
+        else if (mood === 'sad') soundManager.playMoodSad()
+        else soundManager.playMoodMeh()
+      }, 200)
+    }
+
     for (const effect of effects) {
       if (effect.type === 'ALL_NINE') {
         pendingAllNine = true
@@ -642,7 +669,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { tannenbaumSession, statistics, dailyRecords, cosmetics } = get()
     if (!tannenbaumSession) return
     soundManager.playPinsFall(pinsDown)
+    const mood = evaluateTannenbaumMood(tannenbaumSession.remaining, pinsDown)
     const { session: next, completed } = resolveTannenbaumThrow(tannenbaumSession, pinsDown)
+
+    // Stimmungs-Sound (Teil: Reaktions-Mimik) - bei Spielende übernimmt playVictory() weiter unten
+    // die Feier, daher hier ausgenommen. Kurze Verzögerung gegen Kollision mit dem Kegelgeräusch.
+    if (!completed) {
+      window.setTimeout(() => {
+        if (mood === 'happy') soundManager.playMoodHappy()
+        else soundManager.playMoodSad()
+      }, 200)
+    }
 
     if (completed) {
       soundManager.playVictory()
@@ -724,7 +761,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
     resetDailyRecords()
     resetAllTimeBoard()
     resetWeeklyRecords()
-    set({ statistics: {} as Record<CharacterId, PlayerStatistics>, dailyRecords: {}, allTimeBoard: {} })
+    set({
+      statistics: {} as Record<CharacterId, PlayerStatistics>,
+      dailyRecords: {},
+      allTimeBoard: {},
+      weekKey: currentWeekKey(),
+      weeklyPoints: {},
+    })
   },
 
   updateSettings: (partial) => {

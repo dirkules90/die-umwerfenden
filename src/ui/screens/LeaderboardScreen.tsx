@@ -6,6 +6,7 @@ import { todayKey } from '../../game/dateKey'
 import { ACHIEVEMENT_DEFS, hasAchievement } from '../../game/achievements'
 import { emptyStatistics } from '../../storage/localStorageService'
 import { formatPoints } from '../formatPoints'
+import { LeaderboardTabs } from '../components/LeaderboardTabs'
 import type { CharacterId } from '../../game/types'
 
 export function LeaderboardScreen() {
@@ -37,6 +38,7 @@ export function LeaderboardScreen() {
         ← Zurück
       </button>
       <h2 style={{ margin: 0 }}>Bestenliste</h2>
+      <LeaderboardTabs active="leaderboard" />
 
       <div className="panel tagessieger-panel">
         <div style={{ fontWeight: 700 }}>🏆 Tagessieger</div>
@@ -87,10 +89,6 @@ export function LeaderboardScreen() {
         Achievements: Bonuspunkte für heute freigeschaltete Achievements (siehe unten). Gesamt = Spielpunkte +
         Achievements, daraus ergibt sich der Platz (#). Beste Werte je Spieler: Spieler-Buttons unten auswählen.
       </p>
-
-      <button className="btn secondary" onClick={() => goTo('allTime')}>
-        Allzeit-Bestenliste
-      </button>
 
       <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'center' }}>
         {CHARACTER_ORDER.map((id) => (

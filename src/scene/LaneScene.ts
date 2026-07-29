@@ -24,6 +24,9 @@ import { CameraRig } from './CameraRig'
 import { Animator } from './Animator'
 import { CharacterModel } from '../characters/CharacterModel'
 import type { AvatarConfig, CosmeticLoadout } from '../game/types'
+import type { ThrowMood } from '../game/moodRules'
+
+export type { ThrowMood } from '../game/moodRules'
 
 type ThrowPhase = 'idle' | 'aiming' | 'rolling' | 'settled'
 
@@ -32,12 +35,6 @@ export interface SettleResult {
   isGutter: boolean
   wasAllNine: boolean
 }
-
-/** Stimmung eines Wurfs (Teil: Reaktions-Mimik) - wird vom Aufrufer (GameScreen/TannenbaumScreen)
- * bestimmt, da nur der jeweils Spielmodus weiß, ob z.B. eine 3 bei "Hoch" schlecht und bei
- * "Niedrig" gut ist. Ohne evaluateMood (siehe releaseThrow) fällt die Szene auf eine einfache,
- * modusunabhängige Einschätzung zurück. */
-export type ThrowMood = 'happy' | 'meh' | 'sad'
 
 // Kamera muss HINTER dem Charakter stehen (größerer Z-Wert), sonst blickt sie an ihm
 // vorbei nach vorn und der Werfer ist nie im Bild.

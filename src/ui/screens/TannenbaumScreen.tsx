@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { cosmeticsFor, useGameStore } from '../../state/gameStore'
-import { LaneScene, type ThrowMood } from '../../scene/LaneScene'
+import { LaneScene } from '../../scene/LaneScene'
 import { AVATAR_CONFIGS } from '../../characters/avatarConfigs'
+import { evaluateTannenbaumMood } from '../../game/moodRules'
 import { useDragShoot } from '../hooks/useDragShoot'
 import { useLeverDrag } from '../hooks/useLeverDrag'
 import { useSteerDrag } from '../hooks/useSteerDrag'
@@ -12,13 +13,6 @@ import { FullscreenButton } from '../components/FullscreenButton'
 import { MoodFace } from '../components/MoodFace'
 import { TannenbaumTree } from '../components/TannenbaumTree'
 import type { Mood } from '../../characters/faceArt'
-
-/** Beim Tannenbaum gibt es bewusst nur Freude oder Trauer, kein "naja" (Teil: Reaktions-Mimik) -
- * ein Wurf trifft entweder eine noch offene Zahl oder verpufft wirkungslos, ein Mittelding gibt es
- * hier nicht. */
-function evaluateTannenbaumMood(remaining: Record<number, number>, pinsDown: number): ThrowMood {
-  return remaining[pinsDown] > 0 ? 'happy' : 'sad'
-}
 
 export function TannenbaumScreen() {
   const session = useGameStore((s) => s.tannenbaumSession)

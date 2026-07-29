@@ -241,6 +241,22 @@ class SoundManager {
     this.tone(880, 0.05, { type: 'square', gain: 0.08 })
   }
 
+  /** Stimmungs-Sounds (Teil: Reaktions-Mimik) - kurze, klar unterscheidbare akustische Signale, die
+   * die Mimik/Kamera-Reaktion aus scene/LaneScene.ts begleiten. Bewusst leiser/kürzer als
+   * playAllNine/playVictory, da sie nach JEDEM Wurf laufen können, nicht nur bei besonderen
+   * Momenten. */
+  playMoodHappy() {
+    ;[659, 880].forEach((f, i) => window.setTimeout(() => this.tone(f, 0.2, { type: 'triangle', gain: 0.18 }), i * 90))
+  }
+
+  playMoodMeh() {
+    this.tone(340, 0.14, { type: 'sine', gain: 0.1 })
+  }
+
+  playMoodSad() {
+    this.tone(300, 0.4, { type: 'sine', freqEnd: 170, gain: 0.16 })
+  }
+
   startAmbientLoop() {
     const ctx = this.ensureContext()
     if (this.ambientSource) return

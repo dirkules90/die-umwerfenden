@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { cosmeticsFor, useGameStore } from '../../state/gameStore'
-import { LaneScene, type ThrowMood } from '../../scene/LaneScene'
+import { LaneScene } from '../../scene/LaneScene'
 import { AVATAR_CONFIGS } from '../../characters/avatarConfigs'
 import { currentPlayer } from '../../game/gameStateMachine'
 import { DIGIT_SLOTS, freeSlots } from '../../game/houseNumberRules'
 import { groupHighscore } from '../../game/highscore'
+import { evaluateHausnummerMood } from '../../game/moodRules'
 import { useDragShoot } from '../hooks/useDragShoot'
 import { useLeverDrag } from '../hooks/useLeverDrag'
 import { useSteerDrag } from '../hooks/useSteerDrag'
@@ -14,25 +15,9 @@ import { ControlsHelp } from '../components/ControlsHelp'
 import { FullscreenButton } from '../components/FullscreenButton'
 import { MoodFace } from '../components/MoodFace'
 import type { Mood } from '../../characters/faceArt'
-import type { DigitSlot, GameMode } from '../../game/types'
+import type { DigitSlot } from '../../game/types'
 
 const SLOT_LABELS: Record<DigitSlot, string> = { hundert: 'Hunderter', zehn: 'Zehner', einer: 'Einer' }
-
-/** Stimmung eines Hausnummer-Wurfs (Teil: Reaktions-Mimik) - "gut" bedeutet je nach Modus etwas
- * anderes: bei "Hoch" ist eine hohe Ziffer gut, bei "Niedrig" eine niedrige. Rinne ist unabhängig
- * vom Modus immer ein "trauriger" Moment - auch wenn sie bei "Niedrig" zufällig die Ziffer 9 gibt,
- * die dort eigentlich schlecht wäre, bleibt der Rinnenwurf visuell ein Fehlwurf. */
-function evaluateHausnummerMood(mode: GameMode, pinsDown: number, isGutter: boolean): ThrowMood {
-  if (isGutter) return 'sad'
-  if (mode === 'hoch') {
-    if (pinsDown >= 6) return 'happy'
-    if (pinsDown <= 2) return 'sad'
-    return 'meh'
-  }
-  if (pinsDown <= 3) return 'happy'
-  if (pinsDown >= 7) return 'sad'
-  return 'meh'
-}
 
 export function GameScreen() {
   const session = useGameStore((s) => s.session)
