@@ -53,12 +53,23 @@ button {
   color: var(--text-light);
   background: var(--vereinsgruen);
   box-shadow: 0 4px 0 #1d3c28, 0 6px 14px rgba(0, 0, 0, 0.35);
-  transition: transform 0.08s ease, box-shadow 0.08s ease;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.15s ease;
+}
+
+/* Dezenter Hover-Glow + leichtes Anheben (Teil: UI-Modernisierung) - nur spürbar bei
+   Maus/Trackpad-Bedienung, auf Touch (kein echtes Hover) wirkungslos und daher risikofrei. */
+@media (hover: hover) {
+  .btn:hover:not(:disabled) {
+    filter: brightness(1.12);
+    transform: translateY(-1px);
+    box-shadow: 0 5px 0 #1d3c28, 0 9px 18px rgba(0, 0, 0, 0.4);
+  }
 }
 
 .btn:active {
   transform: translateY(3px);
   box-shadow: 0 1px 0 #1d3c28, 0 2px 6px rgba(0, 0, 0, 0.3);
+  filter: brightness(0.96);
 }
 
 .btn.secondary {
@@ -90,6 +101,27 @@ button {
   padding: 1rem;
   text-align: center;
   overflow-y: auto;
+  /* Sanfter Übergang statt hartem Screen-Wechsel (Teil: UI-Modernisierung) - läuft automatisch bei
+     jedem Mount, weil ScreenRouter (App.tsx) bei jedem Wechsel eine komplett neue Komponente
+     einhängt statt eine bestehende umzustylen. */
+  animation: screen-fade-in 0.28s ease both;
+}
+
+@keyframes screen-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen {
+    animation: none;
+  }
 }
 
 .panel {
@@ -98,6 +130,45 @@ button {
   border-radius: 20px;
   padding: 1.2rem 1.6rem;
   backdrop-filter: blur(6px);
+  animation: panel-pop 0.25s ease both;
+}
+
+@keyframes panel-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none;
+  }
+}
+
+/* Leuchtender Rahmen für besondere Momente (neuer Rekord, Achievement) - Teil: UI-Modernisierung. */
+.glow-highlight {
+  animation: glow-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 rgba(244, 208, 63, 0);
+  }
+  50% {
+    box-shadow: 0 0 24px 6px rgba(244, 208, 63, 0.55);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glow-highlight {
+    animation: none;
+    box-shadow: 0 0 18px 4px rgba(244, 208, 63, 0.5);
+  }
 }
 
 .title-logo-img {

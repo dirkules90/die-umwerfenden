@@ -213,9 +213,12 @@ export function TannenbaumScreen() {
             <h2>Tannenbaum geschafft!</h2>
             <div className="result-with-mood">
               <MoodFace mood={lastMood} skinColor={playerConfig.skinColor} />
-              <div className="panel" style={{ minWidth: '14rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div
+                className={`panel ${tannenbaumResult.isBest ? 'glow-highlight' : ''}`}
+                style={{ minWidth: '14rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
+              >
                 <div style={{ fontSize: '2.6rem', fontWeight: 800 }}>{tannenbaumResult.throwCount} Würfe</div>
-                {tannenbaumResult.isBest && <div style={{ opacity: 0.9 }}>Neuer Bestwert!</div>}
+                {tannenbaumResult.isBest && <div style={{ opacity: 0.9, color: '#f4d03f' }}>🏆 Neuer Bestwert!</div>}
                 {!tannenbaumResult.isBest && playerStats?.bestTannenbaum !== null && playerStats?.bestTannenbaum !== undefined && (
                   <div style={{ opacity: 0.8 }}>Bestwert: {playerStats.bestTannenbaum} Würfe</div>
                 )}

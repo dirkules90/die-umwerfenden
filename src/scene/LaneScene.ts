@@ -22,6 +22,7 @@ import { Pin } from './Pin'
 import { Lever } from './Lever'
 import { CameraRig } from './CameraRig'
 import { Animator } from './Animator'
+import { ParticleSystem } from './ParticleFX'
 import { CharacterModel } from '../characters/CharacterModel'
 import type { AvatarConfig, CosmeticLoadout } from '../game/types'
 import type { ThrowMood } from '../game/moodRules'
@@ -78,6 +79,7 @@ export class LaneScene {
   private paused = false
   private rollingElapsedMs = 0
   private aimTrajectory: THREE.Line
+  private particles!: ParticleSystem
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false })
@@ -101,6 +103,7 @@ export class LaneScene {
     const env = new Environment()
     this.scene.add(env.group)
     this.scene.add(this.aimTrajectory)
+    this.particles = new ParticleSystem(this.scene)
 
     // Statische Kollisionsfläche der Bahn - bewusst exakt auf Bahnbreite begrenzt (nicht mehr
     // bis weit in die Wiese hinein), damit die Rinne echt tiefer liegen kann (siehe unten) statt
@@ -395,10 +398,14 @@ export class LaneScene {
     }, 480)
   }
 
-  /** Aktualisiert das Sticky-Flag jedes Kegels an Hand des aktuellen Winkels (siehe Pin.everFallen). */
+  /** Aktualisiert das Sticky-Flag jedes Kegels an Hand des aktuellen Winkels (siehe Pin.everFallen).
+   * Löst außerdem genau im Umkipp-Moment einen kleinen Staub-Burst aus (Teil: Optik-Politur). */
   private updateFallenFlags() {
     for (const pin of this.pins) {
-      if (!pin.everFallen && isPinFallen(pin.body.rotation())) pin.everFallen = true
+      if (!pin.everFallen && isPinFallen(pin.body.rotation())) {
+        pin.everFallen = true
+        this.particles.burstDust(pin.mesh.position)
+      }
     }
   }
 
@@ -457,6 +464,12 @@ export class LaneScene {
     this.character?.update(rawDt)
     this.animator.update(rawDt)
     this.cameraRig.update(rawDt)
+    this.particles.update(rawDt)
+    if (this.throwPhase === 'rolling') {
+      const trailPos = this.ball.mesh.position.clone()
+      trailPos.y = 0.02
+      this.particles.emitTrailPoint(trailPos, rawDt * 1000)
+    }
 
     if (this.throwPhase === 'rolling' && !this.slowMoActive) {
       const linvel = this.ball.body.linvel()
@@ -529,6 +542,7 @@ export class LaneScene {
   dispose() {
     this.disposed = true
     this.renderer.setAnimationLoop(null)
+    this.particles?.dispose()
     this.renderer.dispose()
   }
 }

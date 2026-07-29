@@ -276,10 +276,16 @@ export function GameScreen() {
             <h2>Deine Hausnummer</h2>
             <div className="result-with-mood">
               <MoodFace mood={lastMood} skinColor={playerConfig.skinColor} />
-              <div className="panel" style={{ minWidth: '14rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div
+                className={`panel ${finalResult.houseNumber === personalBest ? 'glow-highlight' : ''}`}
+                style={{ minWidth: '14rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
+              >
                 <div style={{ fontSize: '2.6rem', fontWeight: 800 }}>{String(finalResult.houseNumber).padStart(3, '0')}</div>
                 {personalBest !== null && personalBest !== undefined && (
-                  <div style={{ opacity: 0.8 }}>Bestwert: {String(personalBest).padStart(3, '0')}</div>
+                  <div style={{ opacity: 0.8 }}>
+                    Bestwert: {String(personalBest).padStart(3, '0')}
+                    {finalResult.houseNumber === personalBest && <span style={{ color: '#f4d03f' }}> · 🏆 Neuer Bestwert!</span>}
+                  </div>
                 )}
                 {lastGameCoins !== null && (
                   <div style={{ color: '#ffd75e' }}>
