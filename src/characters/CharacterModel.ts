@@ -34,15 +34,14 @@ function buildFaceTexture(mood: Mood, skinColor: string): THREE.CanvasTexture {
   return texture
 }
 
-/** Ein Frisuren-"Kappe" (Kugelausschnitt um den Pol) muss KONZENTRISCH zur Kopfkugel bleiben, um
- * überall flächig aufzuliegen - eine leicht größere capScale (statt 1.0) erzeugt dabei bereits einen
- * gleichmäßigen, kaum sichtbaren Abstand zur Kopfhaut. Ein zusätzlicher y-Versatz verschiebt die
- * Kappe dagegen NICHT entlang der Kopfkrümmung, sondern schiebt die ganze starre Kugelschale
- * geradlinig nach oben/unten - dadurch verliert sie an Rand und Pol gleichermaßen den Bezug zur
- * Kopfoberfläche (Bugfix: Kurzhaarschnitt schwebte sichtbar über dem Kopf, weil der alte, per Hand
- * geschätzte Versatz genau das tat). Ein kleiner konstanter Versatz reicht nur zum Einbetten gegen
- * Z-Fighting am Ansatz, mehr nicht. */
-const HAIR_CAP_EMBED_Y = -0.004
+/** Ein Frisuren-"Kappe" (Kugelausschnitt um den Pol) muss KONZENTRISCH zur Kopfkugel bleiben (also
+ * OHNE y-Versatz), um überall flächig aufzuliegen - ein y-Versatz verschiebt die starre Kugelschale
+ * geradlinig statt entlang der Kopfkrümmung und lässt sie den Bezug zur Kopfoberfläche verlieren
+ * (Bugfix: Kurzhaarschnitt schwebte sichtbar über dem Kopf). HAIR_CAP_SCALE muss dafür spürbar über
+ * 1.0 liegen (statt nur ~1.5%) - sonst hat die Kappe kaum sichtbares Volumen und wirkt wie ein
+ * dünnes, durchscheinendes Muster auf der Kopfhaut statt wie echtes Haar (Bugfix: Frisuren "schimmern
+ * nur durch, bedecken den Kopf aber nicht"). */
+const HAIR_CAP_SCALE = 1.07
 
 const BUILD_SCALE: Record<AvatarConfig['build'], number> = {
   schlank: 0.92,
@@ -296,12 +295,12 @@ export class CharacterModel {
     }
 
     if (cosmetics.headband) {
-      // Deutlich unter dem Haaransatz aller Frisuren platziert, sonst überschneidet es sich mit
-      // der Frisur oder (bei größeren Gläsern) mit der Sonnenbrille.
+      // Deutlich über den Augenbrauen/der Brille platziert (Bugfix: Stirnband saß zu tief und ging
+      // durch die Sonnenbrille) statt knapp über der Augenhöhe.
       const bandMat = new THREE.MeshStandardMaterial({ color: 0xe0483c, roughness: 0.6 })
       const headband = new THREE.Mesh(new THREE.TorusGeometry(headRadius * 0.97, 0.017, 8, 20), bandMat)
       headband.rotation.x = Math.PI / 2
-      headband.position.y = -headRadius * 0.06
+      headband.position.y = headRadius * 0.38
       skullGroup.add(headband)
     }
 
@@ -347,14 +346,11 @@ export class CharacterModel {
   private buildHair(hairMat: THREE.Material, headRadius: number, style: HairStyleId, parent: THREE.Group) {
     switch (style) {
       case 'kurz': {
-        // Radius nur minimal größer als der Kopf (statt sichtbar größer): sonst "schwebt" die
-        // Frisur als eigene Kugelschale über der Kopfkugel statt bündig damit abzuschließen -
-        // konzentrisch zur Kopfkugel (siehe HAIR_CAP_EMBED_Y), nicht per y-Versatz verschoben.
+        // Konzentrisch zur Kopfkugel (siehe HAIR_CAP_SCALE), kein y-Versatz.
         const hair = new THREE.Mesh(
-          new THREE.SphereGeometry(headRadius * 1.015, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.34),
+          new THREE.SphereGeometry(headRadius * HAIR_CAP_SCALE, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.34),
           hairMat,
         )
-        hair.position.y = HAIR_CAP_EMBED_Y
         parent.add(hair)
         break
       }
@@ -362,10 +358,9 @@ export class CharacterModel {
         // Vorher bis 0.54π: reichte damit über den Äquator hinaus bis unter die Augenlinie (Bug:
         // Zottelmähne geht über die Augen). 0.42π endet spürbar oberhalb der Augen.
         const cap = new THREE.Mesh(
-          new THREE.SphereGeometry(headRadius * 1.015, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.42),
+          new THREE.SphereGeometry(headRadius * HAIR_CAP_SCALE, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.42),
           hairMat,
         )
-        cap.position.y = HAIR_CAP_EMBED_Y
         parent.add(cap)
         const back = new THREE.Mesh(new THREE.CapsuleGeometry(headRadius * 0.55, headRadius * 1.1, 4, 8), hairMat)
         back.position.set(0, -headRadius * 0.55, -headRadius * 0.55)
@@ -398,10 +393,9 @@ export class CharacterModel {
         // Vorher bis 0.62π: reichte damit sichtbar bis unter die Augen. 0.46π endet knapp über
         // der Augenbrauen-Linie.
         const hair = new THREE.Mesh(
-          new THREE.SphereGeometry(headRadius * 1.015, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.46),
+          new THREE.SphereGeometry(headRadius * HAIR_CAP_SCALE, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.46),
           hairMat,
         )
-        hair.position.y = HAIR_CAP_EMBED_Y
         parent.add(hair)
         break
       }
