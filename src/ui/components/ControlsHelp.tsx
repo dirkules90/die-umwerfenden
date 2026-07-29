@@ -10,7 +10,11 @@ export function ControlsHelp({ className = 'btn secondary' }: { className?: stri
       </button>
       {open && (
         <div className="round-result-overlay" onClick={() => setOpen(false)}>
-          <div className="panel" style={{ maxWidth: '26rem', textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>
+          <div
+            className="panel"
+            style={{ maxWidth: '26rem', maxHeight: '90vh', overflowY: 'auto', textAlign: 'left' }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <h3 style={{ marginTop: 0 }}>So wirfst du</h3>
             <p>
               Finger auf die Bahn setzen und nach unten ziehen, dann loslassen. Eine Geste steuert drei Dinge

@@ -259,7 +259,7 @@ export function ShopScreen() {
             <h3 style={{ marginTop: 0 }}>Sonnenbrille</h3>
             <div className="shop-option-row">
               {GLASSES_STYLES.map((g) => {
-                const owned = isGlassesStyleOwned(ownership, g.id)
+                const owned = isGlassesStyleOwned(ownership, g.id, config.hasGlasses)
                 return (
                   <button
                     key={g.id}
@@ -276,12 +276,15 @@ export function ShopScreen() {
             {draft.glassesStyle !== loadout.glassesStyle && (
               <button
                 className="btn"
-                disabled={!isGlassesStyleOwned(ownership, draft.glassesStyle) && coins < glassesStylePrice(draft.glassesStyle)}
+                disabled={
+                  !isGlassesStyleOwned(ownership, draft.glassesStyle, config.hasGlasses) &&
+                  coins < glassesStylePrice(draft.glassesStyle, config.hasGlasses)
+                }
                 onClick={() => confirmGlasses(draft.glassesStyle)}
               >
-                {isGlassesStyleOwned(ownership, draft.glassesStyle)
+                {isGlassesStyleOwned(ownership, draft.glassesStyle, config.hasGlasses)
                   ? 'Ausrüsten'
-                  : `Kaufen für ${glassesStylePrice(draft.glassesStyle)} 🪙`}
+                  : `Kaufen für ${glassesStylePrice(draft.glassesStyle, config.hasGlasses)} 🪙`}
               </button>
             )}
           </section>

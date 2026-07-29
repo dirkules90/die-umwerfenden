@@ -370,9 +370,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   equipOrBuyGlasses: (id, style) => {
     const current = cosmeticsFor(get().cosmetics, id)
+    const hasGlassesTrait = AVATAR_CONFIGS[id].hasGlasses
     let updated = current
-    if (!isGlassesStyleOwned(current.ownership, style)) {
-      const price = glassesStylePrice(style)
+    if (!isGlassesStyleOwned(current.ownership, style, hasGlassesTrait)) {
+      const price = glassesStylePrice(style, hasGlassesTrait)
       if (current.coins < price) return false
       updated = {
         ...current,

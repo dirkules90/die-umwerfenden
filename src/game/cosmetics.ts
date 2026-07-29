@@ -46,13 +46,17 @@ export const GLOVES_PRICE = 30
 export const WATCH_PRICE = 90
 export const HEADBAND_PRICE = 25
 
+/** Charaktere mit fester "hasGlasses"-Eigenschaft (Dirk/Fabian) starten mit der 'cool'-Brille
+ * ausgerüstet statt mit einer vom Shop unabhängigen Extra-Geometrie (Bugfix: Shop zeigte "Ohne"
+ * als ausgerüstet, während im 3D-Modell trotzdem eine Brille zu sehen war). So zeigen Shop und
+ * 3D-Modell immer denselben Zustand, und die feste Eigenschaft lässt sich sogar abwählen. */
 export function defaultLoadout(config: AvatarConfig): CosmeticLoadout {
   return {
     hairStyle: 'standard',
     hairColor: config.hairColor,
     shirtStyle: 'standard',
     gloves: false,
-    glassesStyle: 'none',
+    glassesStyle: config.hasGlasses ? 'cool' : 'none',
     watch: false,
     headband: false,
   }
@@ -70,8 +74,11 @@ export function isShirtStyleOwned(ownership: CosmeticOwnership, id: ShirtStyleId
   return id === 'standard' || ownership.shirtStyles.includes(id)
 }
 
-export function isGlassesStyleOwned(ownership: CosmeticOwnership, id: GlassesStyleId): boolean {
-  return id === 'none' || ownership.glassesStyles.includes(id)
+/** hasGlassesTrait: Charaktere mit fester Brillen-Eigenschaft (Dirk/Fabian) besitzen die
+ * 'cool'-Brille kostenlos, ganz ohne das je in `ownership` einzutragen - vermeidet eine
+ * Datenmigration für bereits gespeicherte Shop-Stände. */
+export function isGlassesStyleOwned(ownership: CosmeticOwnership, id: GlassesStyleId, hasGlassesTrait: boolean): boolean {
+  return id === 'none' || (id === 'cool' && hasGlassesTrait) || ownership.glassesStyles.includes(id)
 }
 
 export function hairStylePrice(id: HairStyleId): number {
@@ -82,6 +89,7 @@ export function shirtStylePrice(id: ShirtStyleId): number {
   return SHIRTS.find((s) => s.id === id)?.price ?? 0
 }
 
-export function glassesStylePrice(id: GlassesStyleId): number {
+export function glassesStylePrice(id: GlassesStyleId, hasGlassesTrait: boolean): number {
+  if (id === 'cool' && hasGlassesTrait) return 0
   return GLASSES_STYLES.find((g) => g.id === id)?.price ?? 0
 }
