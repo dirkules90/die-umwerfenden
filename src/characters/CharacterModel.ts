@@ -445,17 +445,20 @@ export class CharacterModel {
    * nur ein kleiner Streifen direkt über der Oberlippe (Teil: Shop-Erweiterung). */
   private buildBeard(style: BeardStyleId, headRadius: number, hairMat: THREE.Material, parent: THREE.Group) {
     if (style === 'schnurrbart') {
-      // Vorher thetaLength=0.09 (nur ~5°) UND ein zusätzlicher position-Versatz: der Streifen war
-      // hauchdünn und durch den Versatz nicht mehr konzentrisch zur Kopfkugel, dadurch praktisch
-      // unsichtbar (Bugfix: "bei Schnurrbart habe ich keinen Bart"). Jetzt spürbar dicker (0.16π)
-      // und ohne eigenen Versatz - sitzt dadurch wie die Vollbart-Geometrie direkt auf der
-      // Kopfoberfläche, nur eben nur ein schmaler Streifen knapp über der Mundhöhe statt des
-      // vollen Bogens.
+      // Zwei Bugs auf einmal behoben: (1) thetaStart lag vorher bei 0.46π (~83°) - das ist
+      // Nasenhöhe, nicht Mundhöhe (der Mund liegt wie beim Vollbart-Ansatz bei ~0.55π/99°), der
+      // Streifen saß also am falschen Fleck. (2) Ohne den zur Vollbart-Geometrie passenden
+      // position-Versatz sitzt ein Kugelausschnitt mit Radius 0.78*headRadius VOLLSTÄNDIG
+      // innerhalb der Kopfkugel (Radius 1.0*headRadius) und ist von außen komplett unsichtbar -
+      // genau das war der eigentliche Grund für "ich sehe immer noch keinen Schnurrbart", nicht
+      // die Dünnheit. Der Versatz schiebt den Streifen wie beim Vollbart nach vorn/unten aus der
+      // Kopfkugel heraus.
       const width = 1.0
       const moustache = new THREE.Mesh(
-        new THREE.SphereGeometry(headRadius * 0.78, 12, 8, Math.PI / 2 - width / 2, width, Math.PI * 0.46, Math.PI * 0.07),
+        new THREE.SphereGeometry(headRadius * 0.78, 12, 8, Math.PI / 2 - width / 2, width, Math.PI * 0.53, Math.PI * 0.08),
         hairMat,
       )
+      moustache.position.set(0, -0.02, 0.045)
       parent.add(moustache)
       return
     }
