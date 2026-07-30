@@ -2,7 +2,6 @@ import type {
   AvatarConfig,
   BeardStyleId,
   CapeId,
-  CapStyleId,
   CosmeticLoadout,
   CosmeticOwnership,
   GlassesStyleId,
@@ -28,12 +27,6 @@ export interface ShirtStyleDef {
 
 export interface GlassesStyleDef {
   id: GlassesStyleId
-  title: string
-  price: number
-}
-
-export interface CapStyleDef {
-  id: CapStyleId
   title: string
   price: number
 }
@@ -98,13 +91,6 @@ export const GLASSES_STYLES: GlassesStyleDef[] = [
   { id: 'abgespaced', title: 'Abgespacte Sonnenbrille', price: 65 },
 ]
 
-export const CAP_STYLES: CapStyleDef[] = [
-  { id: 'none', title: 'Ohne', price: 0 },
-  { id: 'baseball', title: 'Baseballcap', price: 35 },
-  { id: 'beanie', title: 'Wintermütze', price: 30 },
-  { id: 'party', title: 'Partyhut', price: 50 },
-]
-
 export const BEARD_STYLES: BeardStyleDef[] = [
   { id: 'none', title: 'Ohne', price: 0 },
   { id: 'vollbart', title: 'Vollbart', price: 55 },
@@ -163,7 +149,6 @@ export function defaultLoadout(config: AvatarConfig): CosmeticLoadout {
     glassesStyle: config.hasGlasses ? 'cool' : 'none',
     watch: false,
     headband: false,
-    capStyle: 'none',
     beardStyle: config.hasBeard ? 'vollbart' : 'none',
     pantsColor: 'standard',
     shoeColor: 'standard',
@@ -182,7 +167,6 @@ export function emptyOwnership(): CosmeticOwnership {
     glassesStyles: [],
     watch: false,
     headband: false,
-    capStyles: [],
     beardStyles: [],
     pantsColors: [],
     shoeColors: [],
@@ -206,10 +190,6 @@ export function isShirtStyleOwned(ownership: CosmeticOwnership, id: ShirtStyleId
  * Datenmigration für bereits gespeicherte Shop-Stände. */
 export function isGlassesStyleOwned(ownership: CosmeticOwnership, id: GlassesStyleId, hasGlassesTrait: boolean): boolean {
   return id === 'none' || (id === 'cool' && hasGlassesTrait) || ownership.glassesStyles.includes(id)
-}
-
-export function isCapStyleOwned(ownership: CosmeticOwnership, id: CapStyleId): boolean {
-  return id === 'none' || ownership.capStyles.includes(id)
 }
 
 /** hasBeardTrait: analog zu isGlassesStyleOwned - Dirk/Fabian besitzen 'vollbart' kostenlos. */
@@ -250,10 +230,6 @@ export function glassesStylePrice(id: GlassesStyleId, hasGlassesTrait: boolean):
   return GLASSES_STYLES.find((g) => g.id === id)?.price ?? 0
 }
 
-export function capStylePrice(id: CapStyleId): number {
-  return CAP_STYLES.find((c) => c.id === id)?.price ?? 0
-}
-
 export function beardStylePrice(id: BeardStyleId, hasBeardTrait: boolean): number {
   if (id === 'vollbart' && hasBeardTrait) return 0
   return BEARD_STYLES.find((b) => b.id === id)?.price ?? 0
@@ -290,7 +266,6 @@ export function totalPurchasableItemCount(): number {
     (GLASSES_STYLES.length - 1) +
     1 + // Armbanduhr
     1 + // Stirnband
-    (CAP_STYLES.length - 1) +
     (BEARD_STYLES.length - 1) +
     (PANTS_COLORS.length - 1) +
     (SHOE_COLORS.length - 1) +
@@ -311,7 +286,6 @@ export function ownedItemCount(ownership: CosmeticOwnership, config: AvatarConfi
   for (const g of GLASSES_STYLES) if (g.id !== 'none' && isGlassesStyleOwned(ownership, g.id, config.hasGlasses)) count++
   if (ownership.watch) count++
   if (ownership.headband) count++
-  for (const c of CAP_STYLES) if (c.id !== 'none' && isCapStyleOwned(ownership, c.id)) count++
   for (const b of BEARD_STYLES) if (b.id !== 'none' && isBeardStyleOwned(ownership, b.id, config.hasBeard)) count++
   for (const p of PANTS_COLORS) if (p.id !== 'standard' && isPantsColorOwned(ownership, p.id)) count++
   for (const s of SHOE_COLORS) if (s.id !== 'standard' && isShoeColorOwned(ownership, s.id)) count++

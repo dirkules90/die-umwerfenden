@@ -18,14 +18,7 @@ export interface AchievementDef {
 // jeder Spieltag startet damit wieder bei null, statt dass ältere Spieler durch längst erreichte
 // Lebenszeit-Meilensteine dauerhaft im Vorteil bleiben.
 export const ACHIEVEMENT_DEFS: AchievementDef[] = [
-  { id: 'volltreffer', title: 'Volltreffer', description: 'Ein „Alle Neune”-Wurf', bonusPoints: 0.5, coinReward: 10 },
-  {
-    id: 'serientaeter',
-    title: 'Serientäter',
-    description: 'Drei „Alle Neune”-Würfe in Folge innerhalb einer Partie',
-    bonusPoints: 1,
-    coinReward: 20,
-  },
+  { id: 'volltreffer', title: 'Volltreffer', description: 'Ein „Alle Neune”-Wurf', bonusPoints: 3, coinReward: 10 },
   {
     id: 'bahnrand-kenner',
     title: 'Bahnrand-Kenner',

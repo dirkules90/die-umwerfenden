@@ -4,7 +4,6 @@ import { AVATAR_CONFIGS, CHARACTER_ORDER } from '../../characters/avatarConfigs'
 import { CharacterPreviewScene } from '../../characters/CharacterPreviewScene'
 import {
   BEARD_STYLES,
-  CAP_STYLES,
   CAPES,
   GLASSES_STYLES,
   GLOVES_PRICE,
@@ -18,12 +17,10 @@ import {
   WRISTBANDS,
   beardStylePrice,
   capePrice,
-  capStylePrice,
   glassesStylePrice,
   hairStylePrice,
   isBeardStyleOwned,
   isCapeOwned,
-  isCapStyleOwned,
   isGlassesStyleOwned,
   isHairStyleOwned,
   isNecklaceOwned,
@@ -42,7 +39,6 @@ import {
 import type {
   BeardStyleId,
   CapeId,
-  CapStyleId,
   CosmeticLoadout,
   GlassesStyleId,
   HairStyleId,
@@ -64,7 +60,6 @@ export function ShopScreen() {
   const equipOrBuyGlasses = useGameStore((s) => s.equipOrBuyGlasses)
   const equipOrBuyWatch = useGameStore((s) => s.equipOrBuyWatch)
   const equipOrBuyHeadband = useGameStore((s) => s.equipOrBuyHeadband)
-  const equipOrBuyCap = useGameStore((s) => s.equipOrBuyCap)
   const equipOrBuyBeard = useGameStore((s) => s.equipOrBuyBeard)
   const equipOrBuyPantsColor = useGameStore((s) => s.equipOrBuyPantsColor)
   const equipOrBuyShoeColor = useGameStore((s) => s.equipOrBuyShoeColor)
@@ -167,14 +162,6 @@ export function ShopScreen() {
   function confirmHeadband(want: boolean) {
     if (!equipOrBuyHeadband(shopPlayer!, want)) {
       setError('Nicht genug Münzen für das Stirnband.')
-      return
-    }
-    setError('')
-  }
-
-  function confirmCap(style: CapStyleId) {
-    if (!equipOrBuyCap(shopPlayer!, style)) {
-      setError('Nicht genug Münzen für diese Kopfbedeckung.')
       return
     }
     setError('')
@@ -453,35 +440,6 @@ export function ShopScreen() {
                 onClick={() => confirmHeadband(draft.headband)}
               >
                 {!draft.headband || ownership.headband ? 'Ausrüsten' : `Kaufen für ${HEADBAND_PRICE} 🪙`}
-              </button>
-            )}
-          </section>
-
-          <section className="shop-section panel">
-            <h3 style={{ marginTop: 0 }}>Kopfbedeckung</h3>
-            <div className="shop-option-row">
-              {CAP_STYLES.map((c) => {
-                const owned = isCapStyleOwned(ownership, c.id)
-                return (
-                  <button
-                    key={c.id}
-                    className={`shop-option-btn ${draft.capStyle === c.id ? 'active' : ''}`}
-                    onClick={() => setDraft((d) => ({ ...d, capStyle: c.id }))}
-                  >
-                    <span>{c.title}</span>
-                    {!owned && <span className="shop-price">🪙 {c.price}</span>}
-                    {owned && loadout.capStyle === c.id && <span className="shop-owned">Ausgerüstet</span>}
-                  </button>
-                )
-              })}
-            </div>
-            {draft.capStyle !== loadout.capStyle && (
-              <button
-                className="btn"
-                disabled={!isCapStyleOwned(ownership, draft.capStyle) && coins < capStylePrice(draft.capStyle)}
-                onClick={() => confirmCap(draft.capStyle)}
-              >
-                {isCapStyleOwned(ownership, draft.capStyle) ? 'Ausrüsten' : `Kaufen für ${capStylePrice(draft.capStyle)} 🪙`}
               </button>
             )}
           </section>

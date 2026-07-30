@@ -232,7 +232,7 @@ export function TannenbaumScreen() {
               <button className="btn" onClick={() => goTo('modeSelect')}>
                 Nochmal
               </button>
-              <button className="btn secondary" onClick={() => goTo('leaderboard')}>
+              <button className="btn secondary" onClick={() => goTo('weekly')}>
                 Bestenliste
               </button>
               <button className="btn secondary" onClick={backToStartFromGameOver}>

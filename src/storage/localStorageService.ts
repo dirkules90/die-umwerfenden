@@ -7,6 +7,7 @@ const STATS_KEY = 'kegeln-lembeck:stats:v1'
 const SETTINGS_KEY = 'kegeln-lembeck:settings:v1'
 const DAILY_KEY = 'kegeln-lembeck:daily:v1'
 const ALLTIME_KEY = 'kegeln-lembeck:alltime:v1'
+const ALLTIME_WEEKLY_WINS_KEY = 'kegeln-lembeck:alltime-weekly-wins:v1'
 const PIN_KEY = 'kegeln-lembeck:pins:v1'
 const COSMETICS_KEY = 'kegeln-lembeck:cosmetics:v1'
 const WEEKLY_KEY = 'kegeln-lembeck:weekly:v1'
@@ -102,8 +103,10 @@ export function resetDailyRecords(): void {
   localStorage.removeItem(DAILY_KEY)
 }
 
-/** Allzeit-Bestenliste der Tagessiege: je Tag bekommt der/die Tagessieger 1 Punkt (bei
- * Gleichstand aufgeteilt), hier fortlaufend aufsummiert. */
+/** Allzeit-Punktesumme (Teil: Bestenliste-Vereinfachung) - bei jedem Wochenabschluss bekommt JEDER
+ * Charakter seine in dieser Woche gesammelten Punkte gutgeschrieben, nicht nur der/die
+ * Wochensieger. Das macht eine schwache Spielwoche der ganzen Gruppe nicht "unfair billig" für
+ * den, der zufällig etwas mehr gespielt hat, wie es ein reiner Sieger-Punkt täte. */
 export function loadAllTimeBoard(): Partial<Record<CharacterId, number>> {
   try {
     const raw = localStorage.getItem(ALLTIME_KEY)
@@ -120,6 +123,27 @@ export function saveAllTimeBoard(board: Partial<Record<CharacterId, number>>): v
 
 export function resetAllTimeBoard(): void {
   localStorage.removeItem(ALLTIME_KEY)
+}
+
+/** Anzahl gewonnener Kalenderwochen je Charakter (Teil: Bestenliste-Vereinfachung) - ersetzt die
+ * frühere tagesbasierte Siegzählung durch dieselbe Zählweise auf Wochenebene (bei Gleichstand
+ * aufgeteilt), separat von der reinen Punktesumme oben. */
+export function loadAllTimeWeeklyWins(): Partial<Record<CharacterId, number>> {
+  try {
+    const raw = localStorage.getItem(ALLTIME_WEEKLY_WINS_KEY)
+    if (!raw) return {}
+    return JSON.parse(raw)
+  } catch {
+    return {}
+  }
+}
+
+export function saveAllTimeWeeklyWins(wins: Partial<Record<CharacterId, number>>): void {
+  localStorage.setItem(ALLTIME_WEEKLY_WINS_KEY, JSON.stringify(wins))
+}
+
+export function resetAllTimeWeeklyWins(): void {
+  localStorage.removeItem(ALLTIME_WEEKLY_WINS_KEY)
 }
 
 /** Fehlende Einträge bedeuten "noch nie geändert" - Aufrufer fällt dann auf DEFAULT_PIN zurück. */

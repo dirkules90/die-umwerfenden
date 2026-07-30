@@ -2,7 +2,6 @@ import { create } from 'zustand'
 import type {
   BeardStyleId,
   CapeId,
-  CapStyleId,
   CharacterCosmetics,
   CharacterId,
   DigitSlot,
@@ -53,7 +52,6 @@ import {
   isHairStyleOwned,
   isShirtStyleOwned,
   isGlassesStyleOwned,
-  isCapStyleOwned,
   isBeardStyleOwned,
   isPantsColorOwned,
   isShoeColorOwned,
@@ -62,7 +60,6 @@ import {
   isCapeOwned,
   shirtStylePrice,
   glassesStylePrice,
-  capStylePrice,
   beardStylePrice,
   pantsColorPrice,
   shoeColorPrice,
@@ -88,6 +85,7 @@ import {
   loadAllCosmetics,
   loadAllStatistics,
   loadAllTimeBoard,
+  loadAllTimeWeeklyWins,
   loadLoginBonusDates,
   loadPins,
   loadRawDaily,
@@ -95,11 +93,13 @@ import {
   loadSettings,
   resetAllStatistics,
   resetAllTimeBoard,
+  resetAllTimeWeeklyWins,
   resetDailyRecords,
   resetWeeklyRecords,
   saveAllCosmetics,
   saveAllStatistics,
   saveAllTimeBoard,
+  saveAllTimeWeeklyWins,
   saveDailyRecords,
   saveLoginBonusDates,
   savePins,
@@ -115,7 +115,6 @@ export type Screen =
   | 'modeSelect'
   | 'game'
   | 'tannenbaum'
-  | 'leaderboard'
   | 'weekly'
   | 'allTime'
   | 'settings'
@@ -148,7 +147,12 @@ interface GameStore {
   tannenbaumSession: TannenbaumSession | null
   statistics: Record<CharacterId, PlayerStatistics>
   dailyRecords: DailyRecords
+  /** Allzeit-Punktesumme (Teil: Bestenliste-Vereinfachung) - jede Woche fließen ALLE gesammelten
+   * Wochenpunkte jedes Charakters hier ein, nicht nur die des Wochensiegers (siehe
+   * processDailyAndWeeklyRollover). */
   allTimeBoard: Partial<Record<CharacterId, number>>
+  /** Anzahl gewonnener Kalenderwochen je Charakter, separat von der reinen Punktesumme oben. */
+  allTimeWeeklyWins: Partial<Record<CharacterId, number>>
   /** Woche, für die weeklyPoints gerade gesammelt werden (Montag der Woche, siehe game/dateKey.ts) -
    * Teil: Wochen-Bestenliste, damit die UI die aktuelle Wochen-Spanne anzeigen kann. */
   weekKey: string
@@ -189,7 +193,6 @@ interface GameStore {
   equipOrBuyGlasses: (id: CharacterId, style: GlassesStyleId) => boolean
   equipOrBuyWatch: (id: CharacterId, wantWatch: boolean) => boolean
   equipOrBuyHeadband: (id: CharacterId, wantHeadband: boolean) => boolean
-  equipOrBuyCap: (id: CharacterId, style: CapStyleId) => boolean
   equipOrBuyBeard: (id: CharacterId, style: BeardStyleId) => boolean
   equipOrBuyPantsColor: (id: CharacterId, color: PantsColorId) => boolean
   equipOrBuyShoeColor: (id: CharacterId, color: ShoeColorId) => boolean
@@ -272,28 +275,36 @@ function grantCrown(
 }
 
 /**
- * Tages- und Wochenabschluss (Teil: All-Time-Bestenliste / Coin-Shop-Wirtschaft): eine echte
+ * Tages- und Wochenabschluss (Teil: Bestenliste-Vereinfachung / Coin-Shop-Wirtschaft): eine echte
  * "um 23:59:59 ausführen"-Aktion gibt es in einer rein clientseitigen PWA ohne Server nicht.
  * Stattdessen wird beim nächsten App-Start geprüft:
  *
- * 1. Stammen die gespeicherten Tagesrekorde von einem älteren Tag? Falls ja, wird für diesen
- *    abgelaufenen Tag einmalig der/die Tagessieger ermittelt, bekommt 1 Punkt (bei Gleichstand
- *    aufgeteilt) in der All-Time-Liste gutgeschrieben (unverändert), UND die Tagespunkte fließen
- *    zusätzlich in den Wochen-Akkumulator ein.
+ * 1. Stammen die gespeicherten Tagesrekorde von einem älteren Tag? Falls ja, fließen die
+ *    Tagespunkte dieses abgelaufenen Tages in den Wochen-Akkumulator ein - ohne eigene
+ *    Tagessieger-Wertung, denn die gibt es als eigene Bestenliste nicht mehr (nur noch Woche und
+ *    Allzeit, siehe Nutzer-Feedback: "was bringt eine Unterteilung, wenn wir sowieso eine Woche
+ *    warten und das dann übernehmen").
  * 2. Gehört der Wochen-Akkumulator (jetzt inklusive des ggf. gerade abgeschlossenen Tages) noch
- *    zur aktuellen Kalenderwoche? Falls nein, wird der/die Wochensieger aus den gesammelten
- *    Wochenpunkten ermittelt und bekommt einen einmaligen Münzbonus (WEEKLY_WINNER_COIN_BONUS,
- *    bei Gleichstand aufgeteilt) gutgeschrieben - statt eines Bonus für jeden einzelnen Tagessieg.
+ *    zur aktuellen Kalenderwoche? Falls nein, wird abgerechnet:
+ *    - JEDER Charakter bekommt seine in dieser Woche gesammelten Punkte in die Allzeit-Punktesumme
+ *      gutgeschrieben, nicht nur der/die Wochensieger - sonst wäre ein Wochensieg in einer Woche,
+ *      in der alle anderen wenig gespielt haben, unfair "billig" gegenüber jemandem, der über
+ *      mehrere Wochen konstant viele Punkte sammelt, aber nie ganz vorne liegt.
+ *    - Der/die Wochensieger (höchste Punktsumme der Woche, bei Gleichstand aufgeteilt) bekommen
+ *      zusätzlich einen einmaligen Münzbonus (WEEKLY_WINNER_COIN_BONUS), die Krone, UND einen
+ *      Zähler-Punkt in der separaten "Wochensiege"-Spalte der Allzeit-Liste.
  */
 function processDailyAndWeeklyRollover(): {
   statistics: Record<CharacterId, PlayerStatistics>
   dailyRecords: DailyRecords
   allTimeBoard: Partial<Record<CharacterId, number>>
+  allTimeWeeklyWins: Partial<Record<CharacterId, number>>
   weekKey: string
   weeklyPoints: Partial<Record<CharacterId, number>>
 } {
   const statistics = loadAllStatistics()
   let allTimeBoard = loadAllTimeBoard()
+  let allTimeWeeklyWins = loadAllTimeWeeklyWins()
   const raw = loadRawDaily()
 
   const rawWeekly = loadRawWeekly()
@@ -304,14 +315,6 @@ function processDailyAndWeeklyRollover(): {
 
   if (raw && raw.date !== todayKey()) {
     const staleDayTotals = computeTotalDailyPoints(raw.records, statistics, raw.date)
-    const { ids: winners } = dailyWinners(staleDayTotals)
-    if (winners.length > 0) {
-      const share = 1 / winners.length
-      const updatedBoard = { ...allTimeBoard }
-      for (const id of winners) updatedBoard[id] = (updatedBoard[id] ?? 0) + share
-      allTimeBoard = updatedBoard
-      saveAllTimeBoard(allTimeBoard)
-    }
     for (const [id, points] of Object.entries(staleDayTotals) as [CharacterId, number][]) {
       weeklyPoints = { ...weeklyPoints, [id]: (weeklyPoints[id] ?? 0) + points }
     }
@@ -320,13 +323,26 @@ function processDailyAndWeeklyRollover(): {
   }
 
   if (weekKey !== currentWeekKey()) {
+    const updatedBoard = { ...allTimeBoard }
+    for (const [id, points] of Object.entries(weeklyPoints) as [CharacterId, number][]) {
+      if (points > 0) updatedBoard[id] = (updatedBoard[id] ?? 0) + points
+    }
+    allTimeBoard = updatedBoard
+    saveAllTimeBoard(allTimeBoard)
+
     const { ids: weekWinners } = dailyWinners(weeklyPoints)
     if (weekWinners.length > 0) {
+      const share = 1 / weekWinners.length
+      const updatedWins = { ...allTimeWeeklyWins }
+      for (const id of weekWinners) updatedWins[id] = (updatedWins[id] ?? 0) + share
+      allTimeWeeklyWins = updatedWins
+      saveAllTimeWeeklyWins(allTimeWeeklyWins)
+
       const cosmetics = loadAllCosmetics()
-      const share = Math.floor(WEEKLY_WINNER_COIN_BONUS / weekWinners.length)
+      const coinShare = Math.floor(WEEKLY_WINNER_COIN_BONUS / weekWinners.length)
       let updatedCosmetics = cosmetics
       for (const id of weekWinners) {
-        updatedCosmetics = addCoins(updatedCosmetics, id, share)
+        updatedCosmetics = addCoins(updatedCosmetics, id, coinShare)
         updatedCosmetics = grantCrown(updatedCosmetics, id)
       }
       saveAllCosmetics(updatedCosmetics)
@@ -336,7 +352,7 @@ function processDailyAndWeeklyRollover(): {
   }
 
   saveWeeklyRecords(weekKey, weeklyPoints)
-  return { statistics, dailyRecords, allTimeBoard, weekKey, weeklyPoints }
+  return { statistics, dailyRecords, allTimeBoard, allTimeWeeklyWins, weekKey, weeklyPoints }
 }
 
 const initialDailyState = processDailyAndWeeklyRollover()
@@ -350,6 +366,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   statistics: initialDailyState.statistics,
   dailyRecords: initialDailyState.dailyRecords,
   allTimeBoard: initialDailyState.allTimeBoard,
+  allTimeWeeklyWins: initialDailyState.allTimeWeeklyWins,
   weekKey: initialDailyState.weekKey,
   weeklyPoints: initialDailyState.weeklyPoints,
   pins: loadPins(),
@@ -522,25 +539,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       updated = { ...current, coins: current.coins - HEADBAND_PRICE, ownership: { ...current.ownership, headband: true } }
     }
     updated = { ...updated, loadout: { ...updated.loadout, headband: wantHeadband } }
-    const cosmetics = { ...get().cosmetics, [id]: updated }
-    saveAllCosmetics(cosmetics)
-    set({ cosmetics })
-    return true
-  },
-
-  equipOrBuyCap: (id, style) => {
-    const current = cosmeticsFor(get().cosmetics, id)
-    let updated = current
-    if (!isCapStyleOwned(current.ownership, style)) {
-      const price = capStylePrice(style)
-      if (current.coins < price) return false
-      updated = {
-        ...current,
-        coins: current.coins - price,
-        ownership: { ...current.ownership, capStyles: [...current.ownership.capStyles, style] },
-      }
-    }
-    updated = { ...updated, loadout: { ...updated.loadout, capStyle: style } }
     const cosmetics = { ...get().cosmetics, [id]: updated }
     saveAllCosmetics(cosmetics)
     set({ cosmetics })
@@ -752,9 +750,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
         }
         if (!hasAchievement(ps, 'volltreffer', todayKey())) {
           ps = grantWithCoins(ps, 'volltreffer', 'Volltreffer')
-        }
-        if (counters.perfectStreak >= 3 && !hasAchievement(ps, 'serientaeter', todayKey())) {
-          ps = grantWithCoins(ps, 'serientaeter', 'Serientäter')
         }
         updatedStats = { ...updatedStats, [player]: ps }
       }
@@ -1042,12 +1037,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
     resetAllStatistics()
     resetDailyRecords()
     resetAllTimeBoard()
+    resetAllTimeWeeklyWins()
     resetWeeklyRecords()
     saveLoginBonusDates({})
     set({
       statistics: {} as Record<CharacterId, PlayerStatistics>,
       dailyRecords: {},
       allTimeBoard: {},
+      allTimeWeeklyWins: {},
       weekKey: currentWeekKey(),
       weeklyPoints: {},
       loginBonusDates: {},

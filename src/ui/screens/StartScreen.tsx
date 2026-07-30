@@ -41,7 +41,7 @@ export function StartScreen() {
         Neues Spiel
       </button>
       <div style={{ display: 'flex', gap: '0.8rem' }}>
-        <button className="btn secondary" onClick={() => goTo('leaderboard')}>
+        <button className="btn secondary" onClick={() => goTo('weekly')}>
           Bestenliste
         </button>
         <button className="btn secondary" onClick={() => goTo('shopSelect')}>

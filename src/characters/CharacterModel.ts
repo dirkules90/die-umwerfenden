@@ -2,10 +2,11 @@ import * as THREE from 'three'
 import type {
   AvatarConfig,
   BeardStyleId,
-  CapStyleId,
+  CapeId,
   CosmeticLoadout,
   GlassesStyleId,
   HairStyleId,
+  NecklaceId,
   PantsColorId,
   ShirtStyleId,
   ShoeColorId,
@@ -239,31 +240,11 @@ export class CharacterModel {
     this.buildShirtBadge(cosmetics.shirtStyle)
 
     if (cosmetics.necklace !== 'none') {
-      // Kette knapp unterhalb des Kragens (Teil: Shop-Erweiterung) - ein schräg liegender Torus
-      // wirkt an der Brust glaubwürdiger als ein flach aufliegender Ring.
-      const necklaceMat = new THREE.MeshStandardMaterial({
-        color: cosmetics.necklace === 'gold' ? 0xd4af37 : 0xc7ccd1,
-        roughness: 0.3,
-        metalness: 0.6,
-      })
-      const necklace = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.012, 8, 16), necklaceMat)
-      necklace.rotation.x = Math.PI / 2.3
-      necklace.position.y = 0.92
-      this.torsoGroup.add(necklace)
+      this.buildNecklace(cosmetics.necklace)
     }
 
     if (cosmetics.cape !== 'none') {
-      // Einfache Stoffbahn hinter den Schultern (Teil: Shop-Erweiterung) - eine leicht gebogene
-      // Ebene statt aufwendiger Stoffsimulation, reicht für den kosmetischen Effekt völlig aus.
-      const capeMat = new THREE.MeshStandardMaterial({
-        color: cosmetics.cape === 'gold' ? 0xd4af37 : 0x8c2f2f,
-        roughness: 0.85,
-        side: THREE.DoubleSide,
-      })
-      const cape = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.5, 1, 6), capeMat)
-      cape.position.set(0, 0.72, -0.135)
-      cape.rotation.x = 0.15
-      this.torsoGroup.add(cape)
+      this.buildCape(cosmetics.cape)
     }
 
     this.group.add(this.torsoGroup)
@@ -377,17 +358,14 @@ export class CharacterModel {
     skullGroup.add(this.faceMesh)
 
     // Bart rein über cosmetics.beardStyle gesteuert (Bugfix Shop-Erweiterung, analog zur Brille
-    // oben) - die feste "hasBeard"-Eigenschaft (Dirk/Fabian) ist jetzt nur noch der Standard-
-    // Loadout-Wert (siehe defaultLoadout) und für diese Charaktere eine kostenlose Option (siehe
-    // isBeardStyleOwned), damit Shop-Anzeige und 3D-Modell wieder übereinstimmen.
-    const effectiveBeardStyle: BeardStyleId =
-      cosmetics.beardStyle !== 'none' ? cosmetics.beardStyle : config.hasBeard ? 'vollbart' : 'none'
-    if (effectiveBeardStyle !== 'none') {
-      this.buildBeard(effectiveBeardStyle, headRadius, hairMat, skullGroup)
-    }
-
-    if (cosmetics.capStyle !== 'none') {
-      this.buildCap(cosmetics.capStyle, headRadius, skullGroup)
+    // oben) - die feste "hasBeard"-Eigenschaft (Dirk/Fabian) wirkt nur noch als Standard-
+    // Loadout-Wert (siehe defaultLoadout) und als kostenlose Option (siehe isBeardStyleOwned), OHNE
+    // hier zusätzlich einzugreifen. Ein früherer Fallback auf 'vollbart' für Träger dieser
+    // Eigenschaft, sobald cosmetics.beardStyle==='none' war, überschrieb ein bewusst gewähltes
+    // "Ohne" (Bugfix: "wenn ich auf Ohne klicke, habe ich trotzdem einen Bart" - Vollbart und Ohne
+    // sahen dadurch identisch aus).
+    if (cosmetics.beardStyle !== 'none') {
+      this.buildBeard(cosmetics.beardStyle, headRadius, hairMat, skullGroup)
     }
 
     if (cosmetics.crown) {
@@ -467,12 +445,17 @@ export class CharacterModel {
    * nur ein kleiner Streifen direkt über der Oberlippe (Teil: Shop-Erweiterung). */
   private buildBeard(style: BeardStyleId, headRadius: number, hairMat: THREE.Material, parent: THREE.Group) {
     if (style === 'schnurrbart') {
-      const width = 1.1
+      // Vorher thetaLength=0.09 (nur ~5°) UND ein zusätzlicher position-Versatz: der Streifen war
+      // hauchdünn und durch den Versatz nicht mehr konzentrisch zur Kopfkugel, dadurch praktisch
+      // unsichtbar (Bugfix: "bei Schnurrbart habe ich keinen Bart"). Jetzt spürbar dicker (0.16π)
+      // und ohne eigenen Versatz - sitzt dadurch wie die Vollbart-Geometrie direkt auf der
+      // Kopfoberfläche, nur eben nur ein schmaler Streifen knapp über der Mundhöhe statt des
+      // vollen Bogens.
+      const width = 1.0
       const moustache = new THREE.Mesh(
-        new THREE.SphereGeometry(headRadius * 0.72, 12, 8, Math.PI / 2 - width / 2, width, Math.PI * 0.49, 0.09),
+        new THREE.SphereGeometry(headRadius * 0.78, 12, 8, Math.PI / 2 - width / 2, width, Math.PI * 0.46, Math.PI * 0.07),
         hairMat,
       )
-      moustache.position.set(0, -0.03, 0.05)
       parent.add(moustache)
       return
     }
@@ -498,51 +481,6 @@ export class CharacterModel {
     parent.add(beard)
   }
 
-  /** Drei Kopfbedeckungen (Teil: Shop-Erweiterung) - Baseballcap (Kuppel + Schirm), Wintermütze
-   * (Kuppel + umgeschlagener Rand) und Partyhut (Kegel + Bommel), jeweils deutlich unterscheidbar
-   * und OHNE y-Versatz konzentrisch zur Kopfkugel (siehe HAIR_CAP_SCALE-Kommentar oben). */
-  private buildCap(style: CapStyleId, headRadius: number, parent: THREE.Group) {
-    if (style === 'baseball') {
-      const capMat = new THREE.MeshStandardMaterial({ color: 0x2f6fb0, roughness: 0.7 })
-      const dome = new THREE.Mesh(
-        new THREE.SphereGeometry(headRadius * HAIR_CAP_SCALE, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.46),
-        capMat,
-      )
-      parent.add(dome)
-      // Schirm als halbrunde, flach liegende Scheibe vor der Stirn statt eines Zylinderausschnitts
-      // (der hätte eine gebogene Wand statt einer flachen Fläche ergeben).
-      const brim = new THREE.Mesh(new THREE.CircleGeometry(headRadius * 0.55, 16, -Math.PI / 2, Math.PI), capMat)
-      brim.rotation.x = -Math.PI / 2 + 0.25
-      brim.position.set(0, headRadius * 0.02, headRadius * 0.85)
-      parent.add(brim)
-      return
-    }
-    if (style === 'beanie') {
-      const beanieMat = new THREE.MeshStandardMaterial({ color: 0x8c2f2f, roughness: 0.85 })
-      const dome = new THREE.Mesh(
-        new THREE.SphereGeometry(headRadius * HAIR_CAP_SCALE, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.52),
-        beanieMat,
-      )
-      parent.add(dome)
-      const fold = new THREE.Mesh(new THREE.TorusGeometry(headRadius * 0.92, 0.028, 8, 20), beanieMat)
-      fold.rotation.x = Math.PI / 2
-      fold.position.y = headRadius * 0.08
-      parent.add(fold)
-      const pompom = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), new THREE.MeshStandardMaterial({ color: 0xf2f2ec, roughness: 0.9 }))
-      pompom.position.y = headRadius * HAIR_CAP_SCALE
-      parent.add(pompom)
-      return
-    }
-    // party
-    const partyMat = new THREE.MeshStandardMaterial({ color: 0xf4d03f, roughness: 0.6 })
-    const cone = new THREE.Mesh(new THREE.ConeGeometry(headRadius * 0.62, headRadius * 1.6, 12), partyMat)
-    cone.position.y = headRadius * 0.75
-    parent.add(cone)
-    const pompom = new THREE.Mesh(new THREE.SphereGeometry(0.03, 10, 8), new THREE.MeshStandardMaterial({ color: 0xff2fb0, roughness: 0.6 }))
-    pompom.position.y = headRadius * 1.55
-    parent.add(pompom)
-  }
-
   /** Vier Frisuren zur Auswahl (Teil: Kosmetik-Shop) - deutlich unterscheidbare Silhouetten statt
    * feiner Detailvarianten, damit man auf einen Blick erkennt, welche gerade ausgerüstet ist. */
   private buildHair(hairMat: THREE.Material, headRadius: number, style: HairStyleId, parent: THREE.Group) {
@@ -558,15 +496,34 @@ export class CharacterModel {
       }
       case 'lang': {
         // Vorher bis 0.54π: reichte damit über den Äquator hinaus bis unter die Augenlinie (Bug:
-        // Zottelmähne geht über die Augen). 0.42π endet spürbar oberhalb der Augen.
+        // Zottelmähne geht über die Augen). 0.42π endet spürbar oberhalb der Augen. Diese vordere
+        // Deckelhöhe reichte aber am Hinterkopf nicht bis zum Pferdeschwanz herunter - von hinten
+        // betrachtet klaffte eine sichtbare Lücke zwischen Kopfhaar und Zopf (Bugfix: "keine
+        // Verbindung zwischen dem langen Haar und den Haaren oben auf dem Kopf"). Ein zweiter,
+        // NUR am Hinterkopf sichtbarer Deckel (Phi-Ausschnitt wie beim Bart/Rückenteil-Cape)
+        // reicht deutlich tiefer herunter und überlappt großzügig mit dem Zopf darunter.
         const cap = new THREE.Mesh(
           new THREE.SphereGeometry(headRadius * HAIR_CAP_SCALE, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.42),
           hairMat,
         )
         parent.add(cap)
-        const back = new THREE.Mesh(new THREE.CapsuleGeometry(headRadius * 0.55, headRadius * 1.1, 4, 8), hairMat)
-        back.position.set(0, -headRadius * 0.55, -headRadius * 0.55)
-        back.rotation.x = 0.15
+        const backWidth = Math.PI * 1.3
+        const backCap = new THREE.Mesh(
+          new THREE.SphereGeometry(
+            headRadius * HAIR_CAP_SCALE,
+            16,
+            12,
+            (3 * Math.PI) / 2 - backWidth / 2,
+            backWidth,
+            0,
+            Math.PI * 0.68,
+          ),
+          hairMat,
+        )
+        parent.add(backCap)
+        const back = new THREE.Mesh(new THREE.CapsuleGeometry(headRadius * 0.5, headRadius * 1.0, 4, 8), hairMat)
+        back.position.set(0, -headRadius * 0.75, -headRadius * 0.78)
+        back.rotation.x = 0.35
         parent.add(back)
         break
       }
@@ -613,6 +570,69 @@ export class CharacterModel {
     const badge = new THREE.Mesh(new THREE.CircleGeometry(0.115, 20), badgeMat)
     badge.position.set(0, 0.86, 0.185)
     this.torsoGroup.add(badge)
+  }
+
+  /** Kette knapp unter dem Kinn/Bart, oberhalb des Shirt-Badges (Teil: Shop-Erweiterung). Der
+   * Ring-Radius (0.15) ist bewusst größer als der Torso-Querschnitt an dieser Höhe (~0.12 bei
+   * y=0.95, Torso-Kapsel-Radius 0.19 verjüngt sich zum Hals hin) - sonst verschwindet die Kette
+   * optisch im Oberkörper-Mesh (Bugfix: "ich sehe keine Kette, wenn ich sie anklicke"). */
+  private buildNecklace(style: NecklaceId) {
+    const necklaceMat = new THREE.MeshStandardMaterial({
+      color: style === 'gold' ? 0xd4af37 : 0xc7ccd1,
+      roughness: 0.3,
+      metalness: 0.6,
+    })
+    const necklace = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.014, 8, 20), necklaceMat)
+    necklace.rotation.x = Math.PI / 2
+    necklace.position.y = 0.95
+    this.torsoGroup.add(necklace)
+  }
+
+  /** Rückenteil-Cape als gebogener Zylinderausschnitt statt einer flachen Ebene (Bugfix: ein
+   * flaches PlaneGeometry folgte der runden Torso-Silhouette nicht und schnitt bei Drehung
+   * sichtbar durch den Körper). Der Zylinderradius (0.26) liegt deutlich außerhalb des
+   * Torso-Radius (max. 0.19), damit garantiert nichts überschneidet. Die Eckpunkte bekommen
+   * zusätzlich eine sinusförmige Auslenkung Richtung Saum, damit es wie leicht bewegter Stoff
+   * wirkt statt wie eine starre Fläche (Bugfix: "aktuell nur ein Viereck"). */
+  private buildCape(style: CapeId) {
+    const capeMat = new THREE.MeshStandardMaterial({
+      color: style === 'gold' ? 0xd4af37 : 0x8c2f2f,
+      roughness: 0.85,
+      side: THREE.DoubleSide,
+    })
+    const capeRadius = 0.26
+    const capeHeight = 0.55
+    const backWidth = Math.PI * 0.9
+    // Wichtig: CylinderGeometry zählt sein theta anders als SphereGeometry sein phi (dort ist
+    // vorne bei π/2, bei einem Zylinder aber bei 0 und hinten bei π statt 3π/2) - das falsche
+    // Vorzeichen hier hätte das Cape seitlich statt hinten platziert (Bugfix: Cape lag quer über
+    // der Vorderseite/Seite statt auf dem Rücken zu liegen).
+    const capeGeo = new THREE.CylinderGeometry(
+      capeRadius,
+      capeRadius,
+      capeHeight,
+      16,
+      8,
+      true,
+      Math.PI - backWidth / 2,
+      backWidth,
+    )
+    const pos = capeGeo.attributes.position
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i)
+      const y = pos.getY(i)
+      const z = pos.getZ(i)
+      const angle = Math.atan2(z, x)
+      const hemFactor = (capeHeight / 2 - y) / capeHeight // 0 oben, 1 am Saum
+      const wave = Math.sin(angle * 6) * 0.03 * hemFactor
+      const scale = 1 + wave / capeRadius
+      pos.setX(i, x * scale)
+      pos.setZ(i, z * scale)
+    }
+    capeGeo.computeVertexNormals()
+    const cape = new THREE.Mesh(capeGeo, capeMat)
+    cape.position.set(0, 0.73, 0)
+    this.torsoGroup.add(cape)
   }
 
   setAnimState(state: CharacterAnimState) {

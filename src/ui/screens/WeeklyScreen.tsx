@@ -1,8 +1,11 @@
+import { useState } from 'react'
 import { useGameStore } from '../../state/gameStore'
 import { AVATAR_CONFIGS, CHARACTER_ORDER } from '../../characters/avatarConfigs'
 import { computeTotalDailyPoints, dailyWinners } from '../../game/dailyWinner'
 import { mondayOfWeek, todayKey } from '../../game/dateKey'
 import { WEEKLY_WINNER_COIN_BONUS } from '../../game/coins'
+import { ACHIEVEMENT_DEFS, hasAchievement } from '../../game/achievements'
+import { emptyStatistics } from '../../storage/localStorageService'
 import { formatPoints } from '../formatPoints'
 import { LeaderboardTabs } from '../components/LeaderboardTabs'
 import { AmbientBackground } from '../components/AmbientBackground'
@@ -14,11 +17,17 @@ function formatShort(date: Date): string {
   return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.`
 }
 
+/** Zusammengeführte Bestenliste (Teil: Bestenliste-Vereinfachung) - vorher gab es Heute/Woche/
+ * Allzeit als drei gleichwertige Tabs, obwohl "Heute" nur ein Zwischenstand ist, der sowieso in die
+ * Wochensumme einfließt. Jetzt ist die Woche die "lebendige" Ansicht (inkl. der heutigen, noch
+ * laufenden Punkte) und trägt zusätzlich den Charakter-Detailbereich (Bestwerte, Achievements), der
+ * vorher auf der separaten Heute-Seite lag. */
 export function WeeklyScreen() {
   const weeklyPoints = useGameStore((s) => s.weeklyPoints)
   const dailyRecords = useGameStore((s) => s.dailyRecords)
   const statistics = useGameStore((s) => s.statistics)
   const goTo = useGameStore((s) => s.goTo)
+  const [selected, setSelected] = useState<CharacterId>('daniel')
 
   const monday = mondayOfWeek(new Date())
   const sunday = new Date(monday)
@@ -38,6 +47,10 @@ export function WeeklyScreen() {
   const rows = CHARACTER_ORDER.map((id) => ({ id, points: combined[id] ?? 0 })).sort((a, b) => b.points - a.points)
   const { ids: projectedWinners, points: projectedWinnerPoints } = dailyWinners(combined)
 
+  const detailStats = statistics[selected] ?? emptyStatistics()
+  const avgHigh = detailStats.countHigh > 0 ? (detailStats.totalScoreHigh / detailStats.countHigh).toFixed(1) : '–'
+  const avgLow = detailStats.countLow > 0 ? (detailStats.totalScoreLow / detailStats.countLow).toFixed(1) : '–'
+
   return (
     <div className="screen">
       <AmbientBackground />
@@ -50,8 +63,9 @@ export function WeeklyScreen() {
       <p className="subtitle" style={{ maxWidth: '32rem' }}>
         Eine Kegel-Woche läuft Montag bis Sonntag ({formatShort(monday)} – {formatShort(sunday)}, heute:{' '}
         {todayLabel}). Am Sonntagabend/beim nächsten App-Start wird abgerechnet: der/die Wochensieger (höchste
-        Punktsumme der Woche, bei Gleichstand aufgeteilt) bekommt {WEEKLY_WINNER_COIN_BONUS} 🪙 - danach startet die
-        Zählung wieder bei 0. Noch {daysUntilReset} {daysUntilReset === 1 ? 'Tag' : 'Tage'} bis zur Abrechnung.
+        Punktsumme der Woche, bei Gleichstand aufgeteilt) bekommt {WEEKLY_WINNER_COIN_BONUS} 🪙, alle gesammelten
+        Punkte aller Spieler wandern in die Allzeit-Bestenliste - danach startet die Wochenzählung wieder bei 0.
+        Noch {daysUntilReset} {daysUntilReset === 1 ? 'Tag' : 'Tage'} bis zur Abrechnung.
       </p>
 
       {projectedWinners.length > 0 && (
@@ -93,9 +107,90 @@ export function WeeklyScreen() {
         </table>
       </div>
       <p style={{ maxWidth: '32rem', fontSize: '0.68rem', opacity: 0.65, margin: 0 }}>
-        Wochenpunkte = Summe der Tagespunkte (siehe „Heute”) über die ganze Woche. Noch nicht abgeschlossene
-        (heutige) Punkte zählen hier schon live mit, werden aber erst beim Tagesabschluss dauerhaft gespeichert.
+        Wochenpunkte = Summe der Tagespunkte (Hausnummer Platz 1-3 = 3/2/1, Tannenbaum Platz 1-3 = 6/4/2, plus
+        Achievement-Bonuspunkte). Noch nicht abgeschlossene (heutige) Punkte zählen hier schon live mit, werden aber
+        erst beim Tagesabschluss dauerhaft gespeichert.
       </p>
+
+      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+        {CHARACTER_ORDER.map((id) => (
+          <button
+            key={id}
+            className="btn secondary"
+            style={selected === id ? { outline: '2px solid #7cffb0' } : undefined}
+            onClick={() => setSelected(id)}
+          >
+            {AVATAR_CONFIGS[id].name}
+          </button>
+        ))}
+      </div>
+
+      <div className="panel" style={{ maxWidth: '30rem', width: '100%' }}>
+        <table className="stats-table">
+          <tbody>
+            <tr>
+              <td>Partien gespielt</td>
+              <td>{detailStats.gamesPlayed}</td>
+            </tr>
+            <tr>
+              <td>Serie (Tage in Folge gespielt)</td>
+              <td>{detailStats.currentStreak > 0 ? `🔥 ${detailStats.currentStreak}` : '–'}</td>
+            </tr>
+            <tr>
+              <td>Bester Wert „Hohe Hausnummer”</td>
+              <td>{detailStats.bestHigh !== null ? String(detailStats.bestHigh).padStart(3, '0') : '–'}</td>
+            </tr>
+            <tr>
+              <td>Bester Wert „Niedrige Hausnummer”</td>
+              <td>{detailStats.bestLow !== null ? String(detailStats.bestLow).padStart(3, '0') : '–'}</td>
+            </tr>
+            <tr>
+              <td>Bester Wert „Tannenbaum” (Würfe)</td>
+              <td>{detailStats.bestTannenbaum !== null ? detailStats.bestTannenbaum : '–'}</td>
+            </tr>
+            <tr>
+              <td>Durchschnitt Hoch</td>
+              <td>{avgHigh}</td>
+            </tr>
+            <tr>
+              <td>Durchschnitt Niedrig</td>
+              <td>{avgLow}</td>
+            </tr>
+            <tr>
+              <td>„Alle Neune” gesamt</td>
+              <td>{detailStats.perfectThrows}</td>
+            </tr>
+            <tr>
+              <td>Rinnenwürfe gesamt</td>
+              <td>{detailStats.gutterThrows}</td>
+            </tr>
+            <tr>
+              <td>Längste „Alle Neune”-Serie</td>
+              <td>{detailStats.longestPerfectStreak}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div className="panel" style={{ maxWidth: '30rem', width: '100%' }}>
+        <h3 style={{ marginTop: 0 }}>Achievements</h3>
+        <p style={{ margin: '0 0 0.6rem', fontSize: '0.75rem', opacity: 0.7 }}>
+          Alle Achievements setzen sich täglich zurück und lassen sich jeden Tag neu erreichen.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', textAlign: 'left' }}>
+          {ACHIEVEMENT_DEFS.map((def) => {
+            // Mit dateKey geprüft: an einem neuen Tag zeigt die Liste ein Achievement wieder als
+            // gesperrt, bis die Leistung an diesem Tag erneut erbracht wird.
+            const unlocked = hasAchievement(detailStats, def.id, todayKey())
+            const pointsLabel = def.bonusPoints.toString().replace('.', ',')
+            return (
+              <div key={def.id} style={{ opacity: unlocked ? 1 : 0.4 }}>
+                {unlocked ? '🏆' : '🔒'} <strong>{def.title}</strong> ({pointsLabel} P.) – {def.description}
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }

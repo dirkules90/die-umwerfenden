@@ -22,7 +22,6 @@ export type ShirtStyleId = 'standard' | 'blitz' | 'umwerfenden'
 /** 'none' fällt auf die feste Charakterbrille (AvatarConfig.hasGlasses) zurück, falls vorhanden -
  * eine gekaufte Shop-Brille ersetzt diese sonst optisch (Teil: Shop-Erweiterung). */
 export type GlassesStyleId = 'none' | 'cool' | 'abgespaced'
-export type CapStyleId = 'none' | 'baseball' | 'beanie' | 'party'
 /** 'none' fällt auf den festen Charakterbart (AvatarConfig.hasBeard) zurück, falls vorhanden -
  * analog zu GlassesStyleId (Teil: Shop-Erweiterung). */
 export type BeardStyleId = 'none' | 'vollbart' | 'schnurrbart'
@@ -44,7 +43,6 @@ export interface CosmeticLoadout {
   glassesStyle: GlassesStyleId
   watch: boolean
   headband: boolean
-  capStyle: CapStyleId
   beardStyle: BeardStyleId
   pantsColor: PantsColorId
   shoeColor: ShoeColorId
@@ -65,7 +63,6 @@ export interface CosmeticOwnership {
   glassesStyles: GlassesStyleId[]
   watch: boolean
   headband: boolean
-  capStyles: CapStyleId[]
   beardStyles: BeardStyleId[]
   pantsColors: PantsColorId[]
   shoeColors: ShoeColorId[]
