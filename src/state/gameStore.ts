@@ -39,10 +39,10 @@ import {
 import {
   ACHIEVEMENT_DEFS,
   achievementCoinReward,
-  dailyChallengeIdFor,
-  DAILY_CHALLENGE_BONUS_COINS,
+  weeklyChallengeIdFor,
+  WEEKLY_CHALLENGE_BONUS_COINS,
   grantAchievement,
-  hasAchievement,
+  hasAchievementThisWeek,
 } from '../game/achievements'
 import { computeTotalDailyPoints, dailyWinners, emptyDailyRecord, type DailyRecords } from '../game/dailyWinner'
 import { currentWeekKey, isNextDay, todayKey } from '../game/dateKey'
@@ -706,12 +706,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
     let pendingAllNine = false
 
     function grantWithCoins(ps: PlayerStatistics, id: string, title: string): PlayerStatistics {
-      // Extra-Bonus, wenn dieses Achievement zufällig die heutige Tagesaufgabe ist (siehe
-      // dailyChallengeIdFor) - derselbe Achievement-Pool dient als Vorrat für den Rundlauf.
-      const isDailyChallenge = id === dailyChallengeIdFor(todayKey())
-      const coins = achievementCoinReward(id) + (isDailyChallenge ? DAILY_CHALLENGE_BONUS_COINS : 0)
+      // Extra-Bonus, wenn dieses Achievement zufällig die Wochenaufgabe ist (siehe
+      // weeklyChallengeIdFor) - derselbe Achievement-Pool dient als Vorrat für den Rundlauf.
+      const isWeeklyChallenge = id === weeklyChallengeIdFor(currentWeekKey())
+      const coins = achievementCoinReward(id) + (isWeeklyChallenge ? WEEKLY_CHALLENGE_BONUS_COINS : 0)
       updatedCosmetics = addCoins(updatedCosmetics, player, coins)
-      banner = { playerId: player, title: isDailyChallenge ? `${title} (Tagesaufgabe!)` : title, coins }
+      banner = { playerId: player, title: isWeeklyChallenge ? `${title} (Wochenaufgabe!)` : title, coins }
       soundManager.playCoinGain()
       return grantAchievement(ps, id)
     }
@@ -748,7 +748,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           perfectThrows: ps.perfectThrows + 1,
           longestPerfectStreak: Math.max(ps.longestPerfectStreak, counters.perfectStreak),
         }
-        if (!hasAchievement(ps, 'volltreffer', todayKey())) {
+        if (!hasAchievementThisWeek(ps, 'volltreffer', currentWeekKey())) {
           ps = grantWithCoins(ps, 'volltreffer', 'Volltreffer')
         }
         updatedStats = { ...updatedStats, [player]: ps }
@@ -756,7 +756,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
       if (effect.type === 'GUTTER') {
         let ps = statsFor(updatedStats, player)
         ps = { ...ps, gutterThrows: ps.gutterThrows + 1 }
-        if (counters.gutterCount >= GUTTER_STREAK_FOR_ACHIEVEMENT && !hasAchievement(ps, 'bahnrand-kenner', todayKey())) {
+        if (
+          counters.gutterCount >= GUTTER_STREAK_FOR_ACHIEVEMENT &&
+          !hasAchievementThisWeek(ps, 'bahnrand-kenner', currentWeekKey())
+        ) {
           ps = grantWithCoins(ps, 'bahnrand-kenner', 'Bahnrand-Kenner')
         }
         updatedStats = { ...updatedStats, [player]: ps }
@@ -833,10 +836,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
         if (result) {
           const player = result.playerId
           function grantWithCoins(ps: PlayerStatistics, id: string, title: string): PlayerStatistics {
-            const isDailyChallenge = id === dailyChallengeIdFor(todayKey())
-            const coins = achievementCoinReward(id) + (isDailyChallenge ? DAILY_CHALLENGE_BONUS_COINS : 0)
+            const isWeeklyChallenge = id === weeklyChallengeIdFor(currentWeekKey())
+            const coins = achievementCoinReward(id) + (isWeeklyChallenge ? WEEKLY_CHALLENGE_BONUS_COINS : 0)
             updatedCosmetics = addCoins(updatedCosmetics, player, coins)
-            banner = { playerId: player, title: isDailyChallenge ? `${title} (Tagesaufgabe!)` : title, coins }
+            banner = { playerId: player, title: isWeeklyChallenge ? `${title} (Wochenaufgabe!)` : title, coins }
             window.setTimeout(() => soundManager.playCoinGain(), 250)
             return grantAchievement(ps, id)
           }
@@ -875,13 +878,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
           updatedCosmetics = addCoins(updatedCosmetics, player, gameCoins)
           window.setTimeout(() => soundManager.playCoinGain(), 250)
 
-          // Stammgast/Tiefstapler bewusst auf Tageswerten statt Lebenszeit-Rekorden: so bleiben
-          // sie wie die übrigen Achievements an jedem neuen Tag wieder frisch erreichbar, statt
-          // Spieler, die den Meilenstein längst irgendwann erreicht haben, dauerhaft zu bevorzugen.
-          if (next.mode === 'niedrig' && dayRec.bestLow !== null && dayRec.bestLow <= 111 && !hasAchievement(ps, 'tiefstapler', todayKey())) {
+          // Die Bedingungen (Tiefstapler: Tageswert <= 111, Stammgast: 5 Partien an einem Tag)
+          // bleiben tagesbasiert - nur die Wiederholbarkeits-Sperre (schon diese Woche geschafft?)
+          // ist jetzt wöchentlich statt täglich (siehe hasAchievementThisWeek), damit sie zur
+          // wöchentlichen Bestenliste passt statt inkonsistent täglich zurückzusetzen.
+          if (
+            next.mode === 'niedrig' &&
+            dayRec.bestLow !== null &&
+            dayRec.bestLow <= 111 &&
+            !hasAchievementThisWeek(ps, 'tiefstapler', currentWeekKey())
+          ) {
             ps = grantWithCoins(ps, 'tiefstapler', 'Tiefstapler')
           }
-          if (dayRec.gamesPlayedToday >= 5 && !hasAchievement(ps, 'stammgast', todayKey())) {
+          if (dayRec.gamesPlayedToday >= 5 && !hasAchievementThisWeek(ps, 'stammgast', currentWeekKey())) {
             ps = grantWithCoins(ps, 'stammgast', 'Stammgast')
           }
           updatedStats = { ...updatedStats, [player]: ps }
@@ -961,11 +970,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
       updatedCosmetics = addCoins(updatedCosmetics, player, gameCoins)
       window.setTimeout(() => soundManager.playCoinGain(), 250)
 
-      if (dayRec.gamesPlayedToday >= 5 && !hasAchievement(ps, 'stammgast', todayKey())) {
-        const isDailyChallenge = dailyChallengeIdFor(todayKey()) === 'stammgast'
-        const achCoins = achievementCoinReward('stammgast') + (isDailyChallenge ? DAILY_CHALLENGE_BONUS_COINS : 0)
+      if (dayRec.gamesPlayedToday >= 5 && !hasAchievementThisWeek(ps, 'stammgast', currentWeekKey())) {
+        const isWeeklyChallenge = weeklyChallengeIdFor(currentWeekKey()) === 'stammgast'
+        const achCoins = achievementCoinReward('stammgast') + (isWeeklyChallenge ? WEEKLY_CHALLENGE_BONUS_COINS : 0)
         updatedCosmetics = addCoins(updatedCosmetics, player, achCoins)
-        banner = { playerId: player, title: isDailyChallenge ? 'Stammgast (Tagesaufgabe!)' : 'Stammgast', coins: achCoins }
+        banner = { playerId: player, title: isWeeklyChallenge ? 'Stammgast (Wochenaufgabe!)' : 'Stammgast', coins: achCoins }
         window.setTimeout(() => soundManager.playCoinGain(), 400)
         ps = grantAchievement(ps, 'stammgast')
       }

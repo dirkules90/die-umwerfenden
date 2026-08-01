@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { useGameStore } from '../../state/gameStore'
 import { AVATAR_CONFIGS, CHARACTER_ORDER } from '../../characters/avatarConfigs'
 import { computeTotalDailyPoints, dailyWinners } from '../../game/dailyWinner'
-import { mondayOfWeek, todayKey } from '../../game/dateKey'
+import { currentWeekKey, mondayOfWeek, todayKey } from '../../game/dateKey'
 import { WEEKLY_WINNER_COIN_BONUS } from '../../game/coins'
-import { ACHIEVEMENT_DEFS, hasAchievement } from '../../game/achievements'
+import { ACHIEVEMENT_DEFS, hasAchievementThisWeek } from '../../game/achievements'
 import { emptyStatistics } from '../../storage/localStorageService'
 import { formatPoints } from '../formatPoints'
 import { LeaderboardTabs } from '../components/LeaderboardTabs'
@@ -175,13 +175,13 @@ export function WeeklyScreen() {
       <div className="panel" style={{ maxWidth: '30rem', width: '100%' }}>
         <h3 style={{ marginTop: 0 }}>Achievements</h3>
         <p style={{ margin: '0 0 0.6rem', fontSize: '0.75rem', opacity: 0.7 }}>
-          Alle Achievements setzen sich täglich zurück und lassen sich jeden Tag neu erreichen.
+          Alle Achievements setzen sich jede Kalenderwoche zurück und lassen sich pro Woche neu erreichen.
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', textAlign: 'left' }}>
           {ACHIEVEMENT_DEFS.map((def) => {
-            // Mit dateKey geprüft: an einem neuen Tag zeigt die Liste ein Achievement wieder als
-            // gesperrt, bis die Leistung an diesem Tag erneut erbracht wird.
-            const unlocked = hasAchievement(detailStats, def.id, todayKey())
+            // Mit weekKey geprüft: in einer neuen Kalenderwoche zeigt die Liste ein Achievement
+            // wieder als gesperrt, bis die Leistung in dieser Woche erneut erbracht wird.
+            const unlocked = hasAchievementThisWeek(detailStats, def.id, currentWeekKey())
             const pointsLabel = def.bonusPoints.toString().replace('.', ',')
             return (
               <div key={def.id} style={{ opacity: unlocked ? 1 : 0.4 }}>

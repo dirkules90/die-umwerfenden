@@ -1,11 +1,11 @@
 import type { PlayerStatistics } from './types'
-import { dateKeyFor } from './dateKey'
+import { weekKeyFor } from './dateKey'
 
 export interface AchievementDef {
   id: string
   title: string
   description: string
-  /** Bonuspunkte für den Tagessieger-Score, wenn dieses Achievement am selben Tag
+  /** Bonuspunkte für den Wochensieger-Score, wenn dieses Achievement in der laufenden Woche
    * freigeschaltet wird (Teil: Tagessieger-Bonus). Bewusst niedrig gehalten, damit die
    * Kategorie-Rangpunkte (Hausnummern, Tannenbaum) den Ausschlag geben. */
   bonusPoints: number
@@ -14,9 +14,12 @@ export interface AchievementDef {
   coinReward: number
 }
 
-// Teil 15.3. Alle Achievements sind an einem neuen Tag wieder erreichbar (siehe hasAchievement) -
-// jeder Spieltag startet damit wieder bei null, statt dass ältere Spieler durch längst erreichte
-// Lebenszeit-Meilensteine dauerhaft im Vorteil bleiben.
+// Alle Achievements sind an einer neuen Kalenderwoche wieder erreichbar (siehe
+// hasAchievementThisWeek) - vorher galt ein täglicher Reset, was bei Nutzer-Feedback als
+// verwirrend auffiel ("ich verstehe diese Tagespunkte nicht, wir können nicht mal eine Woche
+// warten"): die Bestenliste selbst läuft ja ohnehin auf Wochenbasis, ein täglicher Achievement-
+// Reset war dazu inkonsistent. Jede Kalenderwoche startet jetzt wieder bei null, statt dass
+// ältere Spieler durch längst erreichte Lebenszeit-Meilensteine dauerhaft im Vorteil bleiben.
 export const ACHIEVEMENT_DEFS: AchievementDef[] = [
   { id: 'volltreffer', title: 'Volltreffer', description: 'Ein „Alle Neune”-Wurf', bonusPoints: 3, coinReward: 10 },
   {
@@ -46,35 +49,34 @@ function coinRewardFor(id: string): number {
   return ACHIEVEMENT_DEFS.find((d) => d.id === id)?.coinReward ?? 0
 }
 
-/** Extra-Münzen, wenn genau das heute im Fokus stehende Achievement geschafft wird (Teil:
- * Tagesaufgabe/Engagement) - kommt oben auf den normalen coinReward drauf. */
-export const DAILY_CHALLENGE_BONUS_COINS = 15
+/** Extra-Münzen, wenn genau das diese Woche im Fokus stehende Achievement geschafft wird (Teil:
+ * Wochenaufgabe/Engagement) - kommt oben auf den normalen coinReward drauf. */
+export const WEEKLY_CHALLENGE_BONUS_COINS = 15
 
-/** Welches Achievement heute die "Tagesaufgabe" ist: ein fester Rundlauf durch ACHIEVEMENT_DEFS
- * nach Kalendertag (Tage seit der Unix-Epoche modulo Listenlänge) statt täglich neu gewürfelt -
- * so wiederholt sich die Auswahl nicht direkt am Folgetag, ist für alle Charaktere gleichzeitig
- * dieselbe (gemeinsames Tagesziel für die Gruppe) und braucht keinen eigenen Speicherplatz, weil
- * sie sich jederzeit erneut aus dem Datum berechnen lässt. */
-export function dailyChallengeIdFor(dateKey: string): string {
-  const [y, m, d] = dateKey.split('-').map(Number)
-  const dayIndex = Math.floor(Date.UTC(y, m - 1, d) / 86_400_000)
-  const index = ((dayIndex % ACHIEVEMENT_DEFS.length) + ACHIEVEMENT_DEFS.length) % ACHIEVEMENT_DEFS.length
+/** Welches Achievement diese Woche die "Wochenaufgabe" ist: ein fester Rundlauf durch
+ * ACHIEVEMENT_DEFS nach Kalenderwoche (Wochen seit der Unix-Epoche modulo Listenlänge) statt
+ * wöchentlich neu gewürfelt - so wiederholt sich die Auswahl nicht direkt in der Folgewoche, ist
+ * für alle Charaktere gleichzeitig dieselbe (gemeinsames Wochenziel für die Gruppe) und braucht
+ * keinen eigenen Speicherplatz, weil sie sich jederzeit erneut aus dem Wochenschlüssel berechnen
+ * lässt. weekKey ist das Montagsdatum der Woche (siehe game/dateKey.ts currentWeekKey). */
+export function weeklyChallengeIdFor(weekKey: string): string {
+  const [y, m, d] = weekKey.split('-').map(Number)
+  const weekIndex = Math.floor(Date.UTC(y, m - 1, d) / (7 * 86_400_000))
+  const index = ((weekIndex % ACHIEVEMENT_DEFS.length) + ACHIEVEMENT_DEFS.length) % ACHIEVEMENT_DEFS.length
   return ACHIEVEMENT_DEFS[index].id
 }
 
-export function dailyChallengeDef(dateKey: string): AchievementDef {
-  const id = dailyChallengeIdFor(dateKey)
+export function weeklyChallengeDef(weekKey: string): AchievementDef {
+  const id = weeklyChallengeIdFor(weekKey)
   return ACHIEVEMENT_DEFS.find((d) => d.id === id)!
 }
 
-/** Ohne dateKey: "jemals geschafft" (z.B. für Statistik-Zwecke). Mit dateKey: "heute schon
- * geschafft" - jedes Achievement gilt nur für den Tag, an dem es freigeschaltet wurde, und muss
- * an einem neuen Tag erneut erreicht werden, um wieder Bonuspunkte und den 🏆-Status zu geben. */
-export function hasAchievement(stats: PlayerStatistics, id: string, dateKey?: string): boolean {
-  if (dateKey) {
-    return stats.achievements.some((a) => a.id === id && dateKeyFor(new Date(a.unlockedAt)) === dateKey)
-  }
-  return stats.achievements.some((a) => a.id === id)
+/** Ohne weekKey: "jemals geschafft" (z.B. für Statistik-Zwecke). Mit weekKey: "diese Woche schon
+ * geschafft" - jedes Achievement gilt nur für die Kalenderwoche, in der es freigeschaltet wurde,
+ * und muss in einer neuen Woche erneut erreicht werden, um wieder Bonuspunkte und den 🏆-Status
+ * zu geben. */
+export function hasAchievementThisWeek(stats: PlayerStatistics, id: string, weekKey: string): boolean {
+  return stats.achievements.some((a) => a.id === id && weekKeyFor(new Date(a.unlockedAt)) === weekKey)
 }
 
 export function grantAchievement(stats: PlayerStatistics, id: string): PlayerStatistics {

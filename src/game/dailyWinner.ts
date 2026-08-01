@@ -18,9 +18,12 @@ export function emptyDailyRecord(): DailyPlayerRecord {
   return { bestHigh: null, bestLow: null, bestTannenbaum: null, gamesPlayedToday: 0 }
 }
 
-// Platzpunkte je Kategorie: Index 0 = Platz 1, Index 1 = Platz 2, usw.
+// Platzpunkte je Kategorie: Index 0 = Platz 1, Index 1 = Platz 2, usw. Tannenbaum gibt bewusst
+// das Vierfache der Hausnummer-Punkte (statt nur des Doppelten wie zuvor) - eine Partie braucht
+// oft 20-30+ Würfe statt nur 3, das muss sich auch in der Bestenliste spürbar niederschlagen
+// (Nutzer-Feedback: "mindestens dreimal so viele Punkte wie bei Hausnummer").
 const POINTS_HAUSNUMMER = [3, 2, 1]
-const POINTS_TANNENBAUM = [6, 4, 2]
+const POINTS_TANNENBAUM = [12, 8, 4]
 
 const ACHIEVEMENT_BONUS_BY_ID: Partial<Record<string, number>> = Object.fromEntries(
   ACHIEVEMENT_DEFS.map((d) => [d.id, d.bonusPoints]),

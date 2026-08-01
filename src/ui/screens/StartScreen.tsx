@@ -3,8 +3,13 @@ import { FullscreenButton } from '../components/FullscreenButton'
 import { AmbientBackground } from '../components/AmbientBackground'
 import { useFullscreen } from '../hooks/useFullscreen'
 import { AVATAR_CONFIGS, CHARACTER_ORDER } from '../../characters/avatarConfigs'
-import { achievementCoinReward, dailyChallengeDef, DAILY_CHALLENGE_BONUS_COINS, hasAchievement } from '../../game/achievements'
-import { todayKey } from '../../game/dateKey'
+import {
+  achievementCoinReward,
+  hasAchievementThisWeek,
+  weeklyChallengeDef,
+  WEEKLY_CHALLENGE_BONUS_COINS,
+} from '../../game/achievements'
+import { currentWeekKey } from '../../game/dateKey'
 
 export function StartScreen() {
   const goTo = useGameStore((s) => s.goTo)
@@ -12,12 +17,12 @@ export function StartScreen() {
   const statistics = useGameStore((s) => s.statistics)
   const { isFullscreen, supported, isStandalone, isIOS } = useFullscreen()
 
-  const today = todayKey()
-  const challenge = dailyChallengeDef(today)
-  const totalReward = achievementCoinReward(challenge.id) + DAILY_CHALLENGE_BONUS_COINS
+  const weekKey = currentWeekKey()
+  const challenge = weeklyChallengeDef(weekKey)
+  const totalReward = achievementCoinReward(challenge.id) + WEEKLY_CHALLENGE_BONUS_COINS
   const completedBy = CHARACTER_ORDER.filter((id) => {
     const stats = statistics[id]
-    return stats && hasAchievement(stats, challenge.id, today)
+    return stats && hasAchievementThisWeek(stats, challenge.id, weekKey)
   })
 
   return (
@@ -26,14 +31,16 @@ export function StartScreen() {
       <img className="title-logo-img" src={`${import.meta.env.BASE_URL}icons/logo.png`} alt="Die Umwerfenden" />
       <p className="subtitle">Die originalgetreue Outdoor-Kegelbahn aus Lembeck.</p>
       <div className="panel daily-challenge-panel">
-        <div className="daily-challenge-title">🎯 Tagesaufgabe: {challenge.title}</div>
+        <div className="daily-challenge-title">🎯 Wochenaufgabe: {challenge.title}</div>
         <p className="subtitle" style={{ margin: 0, fontSize: '0.9rem' }}>
           {challenge.description}
         </p>
-        <div className="daily-challenge-reward">+{totalReward} 🪙 heute (statt sonst {achievementCoinReward(challenge.id)} 🪙)</div>
+        <div className="daily-challenge-reward">
+          +{totalReward} 🪙 diese Woche (statt sonst {achievementCoinReward(challenge.id)} 🪙)
+        </div>
         {completedBy.length > 0 && (
           <div className="daily-challenge-completed">
-            Heute schon geschafft: {completedBy.map((id) => AVATAR_CONFIGS[id].name).join(', ')}
+            Diese Woche schon geschafft: {completedBy.map((id) => AVATAR_CONFIGS[id].name).join(', ')}
           </div>
         )}
       </div>

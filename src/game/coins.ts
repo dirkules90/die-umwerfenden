@@ -8,10 +8,12 @@ import { TANNENBAUM_ROWS } from './tannenbaumRules'
  *   gestaffelt nach Leistung: ein besseres Ergebnis gibt spürbar mehr Münzen als ein
  *   schwaches, aber JEDE Partie gibt mindestens eine Teilnahme-Mindestmenge (siehe
  *   HAUSNUMMER_MIN/TANNENBAUM_FLOOR) - niemand geht leer aus.
- * - Tannenbaum-Partien dauern deutlich länger als eine einzelne Hausnummer-Partie (mehrere
- *   Würfe bis alle 9 Zahlen abgehakt sind, siehe tannenbaumRules.ts), deshalb liegt die
- *   Tannenbaum-Ausbeute für ein durchschnittliches Ergebnis bei etwa dem Dreifachen einer
- *   durchschnittlichen Hausnummer-Partie.
+ * - Tannenbaum-Partien dauern deutlich länger als eine einzelne Hausnummer-Partie (oft 20-30+
+ *   Würfe bis alle 9 Zahlen abgehakt sind, siehe tannenbaumRules.ts, statt nur 3 Würfen bei der
+ *   Hausnummer), deshalb liegt die Tannenbaum-Ausbeute selbst für ein durchschnittliches
+ *   Ergebnis deutlich über dem einer Hausnummer-Partie (Nutzer-Feedback: "sollten mindestens
+ *   dreimal so viele Punkte und Münzen bekommen wie bei Hausnummer") - grob das Vierfache statt
+ *   nur des Doppelten wie zuvor.
  * - Achievements geben zusätzlich einen festen Münzbetrag (siehe achievements.ts), unabhängig
  *   von der Partie, in der sie freigeschaltet wurden.
  * - Der/die Wochensieger (höchste Punktsumme über eine volle, abgeschlossene Kalenderwoche,
@@ -33,9 +35,9 @@ export function coinsForHausnummer(mode: GameMode, houseNumber: number): number 
 }
 
 const TANNENBAUM_MIN_THROWS = TANNENBAUM_ROWS.reduce((sum, r) => sum + r.count, 0)
-const TANNENBAUM_BEST = 75 // Bestmögliches Ergebnis: TANNENBAUM_MIN_THROWS Würfe, keiner verpufft
-const TANNENBAUM_STEP = 3 // Abzug je Wurf über dem Minimum hinaus
-const TANNENBAUM_FLOOR = 6 // Teilnahme-Mindestmenge, auch bei sehr vielen Würfen
+const TANNENBAUM_BEST = 110 // Bestmögliches Ergebnis: TANNENBAUM_MIN_THROWS Würfe, keiner verpufft
+const TANNENBAUM_STEP = 2 // Abzug je Wurf über dem Minimum hinaus
+const TANNENBAUM_FLOOR = 8 // Teilnahme-Mindestmenge, auch bei sehr vielen Würfen
 
 export function coinsForTannenbaum(throwCount: number): number {
   const extraThrows = Math.max(0, throwCount - TANNENBAUM_MIN_THROWS)
