@@ -4,13 +4,21 @@ import { BALL_MASS, BALL_RADIUS, START_Z } from '../physics/laneConstants'
 
 const BALL_COLOR = 0x8a2e22
 const CURVE_STRENGTH = 1.1
-// Begrenzte Nachkorrektur während des Rollens (siehe steer()): Rate pro Sekunde bei vollem
-// Wisch-Input und Gesamtbudget pro Wurf. Bei STEER_RATE=3.2 und STEER_MAX_BUDGET=2.4 reicht das
-// Budget für ca. 0.75s durchgehende Volllenkung - bewusst klein gegenüber dem Effekt von vollem
-// Anfangs-Spin (Teil 29), damit ein schlecht gezielter Wurf per Nachkorrektur nicht einfach zum
-// sicheren Strike wird, sondern nur noch fein nachjustiert werden kann.
+// Begrenzte Nachkorrektur während des Rollens (siehe applySteer()): Rate pro Sekunde bei vollem
+// Wisch-Input und Gesamtbudget pro Wurf. Budget vorher bei 2.4: kombiniert mit der langen
+// Restlaufzeit direkt nach dem Loslassen ließ sich damit quer über die gesamte (nur 1.1m breite)
+// Bahn korrigieren - ein nach rechts gezielter Wurf konnte trotzdem den äußeren linken Kegel
+// treffen (Nutzer-Feedback: "etwas zu leicht"). Zwei Stellschrauben zusammen begrenzen das jetzt:
+// (1) niedrigeres Gesamtbudget (1.3 statt 2.4), (2) ein Anlauf-Faktor (STEER_RAMP_*), der die
+// Lenkwirkung direkt nach dem Loslassen auf STEER_RAMP_FLOOR (25%) drosselt und erst über
+// STEER_RAMP_DURATION Sekunden auf volle Stärke hochfährt - genau der "sofort nach dem Loslassen
+// hart gegensteuern"-Trick (maximale Restlaufzeit = maximale Wirkung) wird damit gezielt
+// entschärft, während spätere Feinkorrekturen ihre volle (wenn auch insgesamt reduzierte)
+// Wirkung behalten.
 const STEER_RATE = 3.2
-const STEER_MAX_BUDGET = 2.4
+const STEER_MAX_BUDGET = 1.3
+const STEER_RAMP_DURATION = 0.4
+const STEER_RAMP_FLOOR = 0.25
 
 export class Ball {
   mesh: THREE.Mesh
@@ -19,6 +27,7 @@ export class Ball {
   private spinFactor = 0
   private steerInput = 0
   private steerBudget = STEER_MAX_BUDGET
+  private rollElapsed = 0
 
   constructor(rapier: typeof RAPIER, world: RAPIER.World) {
     const geo = new THREE.SphereGeometry(BALL_RADIUS, 24, 18)
@@ -53,6 +62,7 @@ export class Ball {
     this.spinFactor = 0
     this.steerInput = 0
     this.steerBudget = STEER_MAX_BUDGET
+    this.rollElapsed = 0
     this.body.setTranslation({ x: 0, y: BALL_RADIUS + 0.05, z: START_Z }, true)
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true)
@@ -68,6 +78,7 @@ export class Ball {
     this.spinFactor = THREE.MathUtils.clamp(spin, -1, 1)
     this.steerInput = 0
     this.steerBudget = STEER_MAX_BUDGET
+    this.rollElapsed = 0
     this.body.setLinvel({ x: vx, y: 0, z: vz }, true)
     this.body.setAngvel({ x: speed * 3, y: this.spinFactor * 10, z: 0 }, true)
   }
@@ -77,17 +88,22 @@ export class Ball {
     this.steerInput = THREE.MathUtils.clamp(direction, -1, 1)
   }
 
-  /** Verbraucht das Lenk-Budget proportional zu Wisch-Input und Zeit, wirkt wie applyCurve nur
-   * spürbar bei ausreichender Geschwindigkeit - dadurch lässt die Wirkung mit dem natürlichen
-   * Ausrollen der Kugel von selbst nach, ganz ohne separate Distanz-Abfrage. */
+  /** Verbraucht das Lenk-Budget proportional zu Wisch-Input, Zeit und dem Anlauf-Faktor (siehe
+   * STEER_RAMP_*), wirkt wie applyCurve nur spürbar bei ausreichender Geschwindigkeit - dadurch
+   * lässt die Wirkung mit dem natürlichen Ausrollen der Kugel von selbst nach, ganz ohne separate
+   * Distanz-Abfrage. rollElapsed läuft unabhängig vom Wisch-Input mit (jeder Fixed-Step während
+   * die Kugel rollt), damit der Anlauf-Faktor die tatsächliche Rollzeit seit dem Loslassen
+   * widerspiegelt statt nur die Zeit mit aktivem Wisch-Input. */
   applySteer(dt: number) {
+    this.rollElapsed += dt
     if (this.steerInput === 0 || this.steerBudget <= 0) return
     const v = this.body.linvel()
     const speed = Math.hypot(v.x, v.z)
     if (speed < 0.4) return
+    const ramp = STEER_RAMP_FLOOR + (1 - STEER_RAMP_FLOOR) * Math.min(1, this.rollElapsed / STEER_RAMP_DURATION)
     const lateralX = -v.z / speed
     const lateralZ = v.x / speed
-    const wanted = this.steerInput * STEER_RATE * dt
+    const wanted = this.steerInput * STEER_RATE * ramp * dt
     const used = Math.sign(wanted) * Math.min(Math.abs(wanted), this.steerBudget)
     this.steerBudget -= Math.abs(used)
     this.body.applyImpulse({ x: lateralX * used, y: 0, z: lateralZ * used }, true)
