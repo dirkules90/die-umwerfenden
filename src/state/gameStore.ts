@@ -108,6 +108,22 @@ import {
 } from '../storage/localStorageService'
 import { soundManager } from '../audio/soundManager'
 import { vibrate } from '../game/haptics'
+import {
+  syncCoinTransactionBestEffort,
+  fetchCoinHistory,
+  fetchWeeklyDuelPoints,
+  type CoinTransactionRow,
+} from '../backend/wallet'
+import {
+  createDuel as backendCreateDuel,
+  respondToDuel as backendRespondToDuel,
+  cancelDuel as backendCancelDuel,
+  fetchMyDuels,
+  markDuelSeen as backendMarkDuelSeen,
+  submitDuelScore,
+  type CreateDuelInput,
+  type Duel,
+} from '../backend/duels'
 
 export type Screen =
   | 'start'
@@ -120,6 +136,9 @@ export type Screen =
   | 'settings'
   | 'shopSelect'
   | 'shop'
+  | 'duelsSelect'
+  | 'duels'
+  | 'coinHistory'
 
 const TOTAL_ROUNDS = 1
 const GUTTER_STREAK_FOR_ACHIEVEMENT = 3
@@ -179,6 +198,22 @@ interface GameStore {
   lastGameCoins: number | null
   pauseMenuOpen: boolean
 
+  /** Charakter, für den der Duelle-Bereich gerade geöffnet ist (Teil: Online-Duelle) - analog zu
+   * shopPlayer, per PIN-Gate ausgewählt (siehe DuelsSelectScreen). */
+  duelsPlayer: CharacterId | null
+  duels: Duel[]
+  duelsLoading: boolean
+  duelError: string | null
+  /** Duell, dessen nächster Wurf-Durchgang gerade läuft (Teil: Unabhängiges Spielen) - bei
+   * Spielende wird das Ergebnis automatisch an dieses Duell gemeldet statt nur lokal gewertet. */
+  activeDuelId: string | null
+  coinHistory: CoinTransactionRow[]
+  coinHistoryLoading: boolean
+  /** Wochenpunkte-Bonus aus gewonnenen Duellen dieser Kalenderwoche (Teil: Wochenbewertung) - lebt
+   * im Backend statt lokal, weil Duelle geräteübergreifend sind (siehe backend/wallet.ts). Wird on
+   * demand für die aktuell betrachtete Bestenliste nachgeladen, siehe loadWeeklyDuelBonus. */
+  weeklyDuelBonus: Partial<Record<CharacterId, number>>
+
   goTo: (screen: Screen) => void
   setPauseMenuOpen: (open: boolean) => void
   openSettings: (from: Screen) => void
@@ -218,6 +253,16 @@ interface GameStore {
   resetStatistics: () => void
   updateSettings: (partial: Partial<Settings>) => void
   backToStartFromGameOver: () => void
+
+  selectDuelsPlayer: (id: CharacterId) => void
+  loadDuels: () => Promise<void>
+  createDuelRequest: (input: Omit<CreateDuelInput, 'challengerId'>) => Promise<boolean>
+  respondToDuelRequest: (duelId: string, accept: boolean) => Promise<boolean>
+  cancelDuelRequest: (duelId: string) => Promise<void>
+  dismissDuelNotification: (duelId: string) => Promise<void>
+  startDuelGame: (duel: Duel) => void
+  loadCoinHistory: (id: CharacterId) => Promise<void>
+  loadWeeklyDuelBonus: () => Promise<void>
 }
 
 function statsFor(store: Record<CharacterId, PlayerStatistics>, id: CharacterId): PlayerStatistics {
@@ -241,14 +286,28 @@ export function cosmeticsFor(
   }
 }
 
+/** reason/meta spiegeln den Münz-Zugang zusätzlich ins Backend (Teil: Online-Duelle/Münz-Historie) -
+ * best effort, damit ein Offline-Moment nicht das eigentliche (lokale) Spielgeschehen blockiert;
+ * der lokale Kontostand bleibt in dem Fall einfach führend, bis die nächste Synchronisierung wieder
+ * gleichzieht. */
 function addCoins(
   cosmeticsMap: Partial<Record<CharacterId, CharacterCosmetics>>,
   id: CharacterId,
   amount: number,
+  reason: string,
+  meta?: Record<string, unknown>,
 ): Partial<Record<CharacterId, CharacterCosmetics>> {
   if (amount <= 0) return cosmeticsMap
   const current = cosmeticsFor(cosmeticsMap, id)
+  syncCoinTransactionBestEffort(id, amount, reason, meta)
   return { ...cosmeticsMap, [id]: { ...current, coins: current.coins + amount } }
+}
+
+/** Analog zu addCoins für Shop-Käufe (Teil: Münz-Historie) - die eigentliche Coins-/Ownership-
+ * Änderung bleibt an den bestehenden 14 equipOrBuyX-Stellen inline, hier wird nur der Backend-
+ * Spiegel-Eintrag ausgelöst. */
+function trackSpend(id: CharacterId, amount: number, item: string): void {
+  syncCoinTransactionBestEffort(id, -amount, 'shop_purchase', { item })
 }
 
 /** Aktualisiert currentStreak/lastPlayedDate anhand des heutigen Datums (Teil: Engagement/Streak) -
@@ -342,7 +401,7 @@ function processDailyAndWeeklyRollover(): {
       const coinShare = Math.floor(WEEKLY_WINNER_COIN_BONUS / weekWinners.length)
       let updatedCosmetics = cosmetics
       for (const id of weekWinners) {
-        updatedCosmetics = addCoins(updatedCosmetics, id, coinShare)
+        updatedCosmetics = addCoins(updatedCosmetics, id, coinShare, 'weekly_winner')
         updatedCosmetics = grantCrown(updatedCosmetics, id)
       }
       saveAllCosmetics(updatedCosmetics)
@@ -382,6 +441,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
   lastGameCoins: null,
   pauseMenuOpen: false,
 
+  duelsPlayer: null,
+  duels: [],
+  duelsLoading: false,
+  duelError: null,
+  activeDuelId: null,
+  coinHistory: [],
+  coinHistoryLoading: false,
+  weeklyDuelBonus: {},
+
   setPauseMenuOpen: (open) => set({ pauseMenuOpen: open }),
 
   goTo: (screen) => {
@@ -409,7 +477,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // so gilt der Bonus für "heute überhaupt reingeschaut" statt nur für einen der beiden Wege.
     const today = todayKey()
     if (get().loginBonusDates[id] !== today) {
-      const cosmetics = addCoins(get().cosmetics, id, LOGIN_BONUS_COINS)
+      const cosmetics = addCoins(get().cosmetics, id, LOGIN_BONUS_COINS, 'login_bonus')
       saveAllCosmetics(cosmetics)
       const loginBonusDates = { ...get().loginBonusDates, [id]: today }
       saveLoginBonusDates(loginBonusDates)
@@ -451,6 +519,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!isHairStyleOwned(current.ownership, style)) {
       const price = hairStylePrice(style)
       if (current.coins < price) return false
+      trackSpend(id, price, `Frisur: ${style}`)
       updated = {
         ...current,
         coins: current.coins - price,
@@ -470,6 +539,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!isShirtStyleOwned(current.ownership, style)) {
       const price = shirtStylePrice(style)
       if (current.coins < price) return false
+      trackSpend(id, price, `Shirt: ${style}`)
       updated = {
         ...current,
         coins: current.coins - price,
@@ -488,6 +558,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     let updated = current
     if (wantGloves && !current.ownership.gloves) {
       if (current.coins < GLOVES_PRICE) return false
+      trackSpend(id, GLOVES_PRICE, 'Handschuhe')
       updated = { ...current, coins: current.coins - GLOVES_PRICE, ownership: { ...current.ownership, gloves: true } }
     }
     updated = { ...updated, loadout: { ...updated.loadout, gloves: wantGloves } }
@@ -504,6 +575,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!isGlassesStyleOwned(current.ownership, style, hasGlassesTrait)) {
       const price = glassesStylePrice(style, hasGlassesTrait)
       if (current.coins < price) return false
+      trackSpend(id, price, `Brille: ${style}`)
       updated = {
         ...current,
         coins: current.coins - price,
@@ -522,6 +594,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     let updated = current
     if (wantWatch && !current.ownership.watch) {
       if (current.coins < WATCH_PRICE) return false
+      trackSpend(id, WATCH_PRICE, 'Uhr')
       updated = { ...current, coins: current.coins - WATCH_PRICE, ownership: { ...current.ownership, watch: true } }
     }
     updated = { ...updated, loadout: { ...updated.loadout, watch: wantWatch } }
@@ -536,6 +609,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     let updated = current
     if (wantHeadband && !current.ownership.headband) {
       if (current.coins < HEADBAND_PRICE) return false
+      trackSpend(id, HEADBAND_PRICE, 'Stirnband')
       updated = { ...current, coins: current.coins - HEADBAND_PRICE, ownership: { ...current.ownership, headband: true } }
     }
     updated = { ...updated, loadout: { ...updated.loadout, headband: wantHeadband } }
@@ -552,6 +626,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!isBeardStyleOwned(current.ownership, style, hasBeardTrait)) {
       const price = beardStylePrice(style, hasBeardTrait)
       if (current.coins < price) return false
+      trackSpend(id, price, `Bart: ${style}`)
       updated = {
         ...current,
         coins: current.coins - price,
@@ -571,6 +646,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!isPantsColorOwned(current.ownership, color)) {
       const price = pantsColorPrice(color)
       if (current.coins < price) return false
+      trackSpend(id, price, `Hose: ${color}`)
       updated = {
         ...current,
         coins: current.coins - price,
@@ -590,6 +666,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!isShoeColorOwned(current.ownership, color)) {
       const price = shoeColorPrice(color)
       if (current.coins < price) return false
+      trackSpend(id, price, `Schuhe: ${color}`)
       updated = {
         ...current,
         coins: current.coins - price,
@@ -609,6 +686,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!isNecklaceOwned(current.ownership, style)) {
       const price = necklacePrice(style)
       if (current.coins < price) return false
+      trackSpend(id, price, `Kette: ${style}`)
       updated = {
         ...current,
         coins: current.coins - price,
@@ -628,6 +706,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!isWristbandOwned(current.ownership, style)) {
       const price = wristbandPrice(style)
       if (current.coins < price) return false
+      trackSpend(id, price, `Armband: ${style}`)
       updated = {
         ...current,
         coins: current.coins - price,
@@ -647,6 +726,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!isCapeOwned(current.ownership, style)) {
       const price = capePrice(style)
       if (current.coins < price) return false
+      trackSpend(id, price, `Umhang: ${style}`)
       updated = {
         ...current,
         coins: current.coins - price,
@@ -710,7 +790,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       // weeklyChallengeIdFor) - derselbe Achievement-Pool dient als Vorrat für den Rundlauf.
       const isWeeklyChallenge = id === weeklyChallengeIdFor(currentWeekKey())
       const coins = achievementCoinReward(id) + (isWeeklyChallenge ? WEEKLY_CHALLENGE_BONUS_COINS : 0)
-      updatedCosmetics = addCoins(updatedCosmetics, player, coins)
+      updatedCosmetics = addCoins(updatedCosmetics, player, coins, 'achievement', { achievementId: id })
       banner = { playerId: player, title: isWeeklyChallenge ? `${title} (Wochenaufgabe!)` : title, coins }
       soundManager.playCoinGain()
       return grantAchievement(ps, id)
@@ -771,7 +851,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!banner) {
       const surpriseBonus = rollSurpriseBonus()
       if (surpriseBonus !== null) {
-        updatedCosmetics = addCoins(updatedCosmetics, player, surpriseBonus)
+        updatedCosmetics = addCoins(updatedCosmetics, player, surpriseBonus, 'surprise_bonus')
         banner = { playerId: player, title: 'Überraschungsbonus', coins: surpriseBonus, kind: 'surprise' }
         soundManager.playSurpriseBonus()
       }
@@ -838,7 +918,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           function grantWithCoins(ps: PlayerStatistics, id: string, title: string): PlayerStatistics {
             const isWeeklyChallenge = id === weeklyChallengeIdFor(currentWeekKey())
             const coins = achievementCoinReward(id) + (isWeeklyChallenge ? WEEKLY_CHALLENGE_BONUS_COINS : 0)
-            updatedCosmetics = addCoins(updatedCosmetics, player, coins)
+            updatedCosmetics = addCoins(updatedCosmetics, player, coins, 'achievement', { achievementId: id })
             banner = { playerId: player, title: isWeeklyChallenge ? `${title} (Wochenaufgabe!)` : title, coins }
             window.setTimeout(() => soundManager.playCoinGain(), 250)
             return grantAchievement(ps, id)
@@ -875,7 +955,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
           saveDailyRecords(updatedDaily)
 
           gameCoins = coinsForHausnummer(next.mode, v)
-          updatedCosmetics = addCoins(updatedCosmetics, player, gameCoins)
+          updatedCosmetics = addCoins(updatedCosmetics, player, gameCoins, 'game_hausnummer', {
+            mode: next.mode,
+            houseNumber: v,
+          })
           window.setTimeout(() => soundManager.playCoinGain(), 250)
 
           // Die Bedingungen (Tiefstapler: Tageswert <= 111, Stammgast: 5 Partien an einem Tag)
@@ -894,6 +977,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
             ps = grantWithCoins(ps, 'stammgast', 'Stammgast')
           }
           updatedStats = { ...updatedStats, [player]: ps }
+
+          // Läuft dieser Wurf-Durchgang im Rahmen eines Duells (Teil: Online-Duelle), wird das
+          // Ergebnis zusätzlich zur normalen lokalen Wertung an das Duell gemeldet - unabhängig
+          // davon, ob der/die Gegner schon gespielt haben (siehe backend/duels.ts submitDuelScore).
+          const activeDuelId = get().activeDuelId
+          if (activeDuelId) {
+            void submitDuelScore(activeDuelId, player, v).catch((err) =>
+              console.error('submitDuelScore failed', err),
+            )
+          }
         }
         saveAllStatistics(updatedStats)
         if (updatedCosmetics !== cosmetics) saveAllCosmetics(updatedCosmetics)
@@ -967,13 +1060,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
       saveDailyRecords(updatedDaily)
 
       const gameCoins = coinsForTannenbaum(throwCount)
-      updatedCosmetics = addCoins(updatedCosmetics, player, gameCoins)
+      updatedCosmetics = addCoins(updatedCosmetics, player, gameCoins, 'game_tannenbaum', { throwCount })
       window.setTimeout(() => soundManager.playCoinGain(), 250)
 
       if (dayRec.gamesPlayedToday >= 5 && !hasAchievementThisWeek(ps, 'stammgast', currentWeekKey())) {
         const isWeeklyChallenge = weeklyChallengeIdFor(currentWeekKey()) === 'stammgast'
         const achCoins = achievementCoinReward('stammgast') + (isWeeklyChallenge ? WEEKLY_CHALLENGE_BONUS_COINS : 0)
-        updatedCosmetics = addCoins(updatedCosmetics, player, achCoins)
+        updatedCosmetics = addCoins(updatedCosmetics, player, achCoins, 'achievement', { achievementId: 'stammgast' })
         banner = { playerId: player, title: isWeeklyChallenge ? 'Stammgast (Wochenaufgabe!)' : 'Stammgast', coins: achCoins }
         window.setTimeout(() => soundManager.playCoinGain(), 400)
         ps = grantAchievement(ps, 'stammgast')
@@ -981,6 +1074,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const updatedStats = { ...statistics, [player]: ps }
       saveAllStatistics(updatedStats)
       if (updatedCosmetics !== cosmetics) saveAllCosmetics(updatedCosmetics)
+
+      const activeDuelId = get().activeDuelId
+      if (activeDuelId) {
+        void submitDuelScore(activeDuelId, player, throwCount).catch((err) =>
+          console.error('submitDuelScore failed', err),
+        )
+      }
 
       soundManager.stopAmbientLoop()
       set({
@@ -997,7 +1097,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       // nicht nur bei Hausnummer-Würfen.
       const surpriseBonus = rollSurpriseBonus()
       if (surpriseBonus !== null) {
-        const updatedCosmetics = addCoins(cosmetics, tannenbaumSession.playerId, surpriseBonus)
+        const updatedCosmetics = addCoins(cosmetics, tannenbaumSession.playerId, surpriseBonus, 'surprise_bonus')
         saveAllCosmetics(updatedCosmetics)
         soundManager.playSurpriseBonus()
         set({
@@ -1078,7 +1178,86 @@ export const useGameStore = create<GameStore>((set, get) => ({
       tannenbaumResult: null,
       lastGameCoins: null,
       pauseMenuOpen: false,
+      activeDuelId: null,
     })
+  },
+
+  selectDuelsPlayer: (id) => {
+    soundManager.playButtonClick()
+    set({ duelsPlayer: id })
+  },
+
+  loadDuels: async () => {
+    const { duelsPlayer } = get()
+    if (!duelsPlayer) return
+    set({ duelsLoading: true, duelError: null })
+    const duels = await fetchMyDuels(duelsPlayer)
+    set({ duels, duelsLoading: false })
+  },
+
+  createDuelRequest: async (input) => {
+    const { duelsPlayer } = get()
+    if (!duelsPlayer) return false
+    set({ duelError: null })
+    const result = await backendCreateDuel({ ...input, challengerId: duelsPlayer })
+    if (!result.ok) {
+      set({ duelError: result.error })
+      return false
+    }
+    await get().loadDuels()
+    return true
+  },
+
+  respondToDuelRequest: async (duelId, accept) => {
+    const { duelsPlayer } = get()
+    if (!duelsPlayer) return false
+    set({ duelError: null })
+    const result = await backendRespondToDuel(duelId, duelsPlayer, accept)
+    if (!result.ok) {
+      set({ duelError: result.error })
+      return false
+    }
+    soundManager.playButtonClick()
+    await get().loadDuels()
+    return true
+  },
+
+  cancelDuelRequest: async (duelId) => {
+    const { duelsPlayer } = get()
+    if (!duelsPlayer) return
+    await backendCancelDuel(duelId, duelsPlayer)
+    await get().loadDuels()
+  },
+
+  dismissDuelNotification: async (duelId) => {
+    const { duelsPlayer } = get()
+    if (!duelsPlayer) return
+    await backendMarkDuelSeen(duelId, duelsPlayer)
+    await get().loadDuels()
+  },
+
+  /** Startet den eigenen Wurf-Durchgang eines akzeptierten Duells (Teil: Unabhängiges Spielen) -
+   * nutzt bewusst dieselbe Session-Logik wie ein normales Solo-Spiel (startGame/startTannenbaum),
+   * damit GameScreen/TannenbaumScreen unverändert bleiben; nur activeDuelId markiert, dass das
+   * Ergebnis am Ende zusätzlich an dieses Duell gemeldet wird (siehe ballReturnComplete /
+   * submitTannenbaumThrow). */
+  startDuelGame: (duel) => {
+    const { duelsPlayer } = get()
+    if (!duelsPlayer) return
+    set({ selectedPlayer: duelsPlayer, activeDuelId: duel.id })
+    if (duel.mode === 'tannenbaum') get().startTannenbaum()
+    else get().startGame(duel.mode === 'hausnummer_hoch' ? 'hoch' : 'niedrig')
+  },
+
+  loadCoinHistory: async (id) => {
+    set({ coinHistoryLoading: true })
+    const coinHistory = await fetchCoinHistory(id)
+    set({ coinHistory, coinHistoryLoading: false })
+  },
+
+  loadWeeklyDuelBonus: async () => {
+    const bonus = await fetchWeeklyDuelPoints(currentWeekKey())
+    set({ weeklyDuelBonus: bonus })
   },
 }))
 

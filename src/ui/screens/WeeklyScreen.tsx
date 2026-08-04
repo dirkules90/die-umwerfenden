@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useGameStore } from '../../state/gameStore'
 import { AVATAR_CONFIGS, CHARACTER_ORDER } from '../../characters/avatarConfigs'
 import { computeTotalDailyPoints, dailyWinners } from '../../game/dailyWinner'
@@ -26,8 +26,14 @@ export function WeeklyScreen() {
   const weeklyPoints = useGameStore((s) => s.weeklyPoints)
   const dailyRecords = useGameStore((s) => s.dailyRecords)
   const statistics = useGameStore((s) => s.statistics)
+  const weeklyDuelBonus = useGameStore((s) => s.weeklyDuelBonus)
+  const loadWeeklyDuelBonus = useGameStore((s) => s.loadWeeklyDuelBonus)
   const goTo = useGameStore((s) => s.goTo)
   const [selected, setSelected] = useState<CharacterId>('daniel')
+
+  useEffect(() => {
+    void loadWeeklyDuelBonus()
+  }, [loadWeeklyDuelBonus])
 
   const monday = mondayOfWeek(new Date())
   const sunday = new Date(monday)
@@ -41,6 +47,11 @@ export function WeeklyScreen() {
   const todayPoints = computeTotalDailyPoints(dailyRecords, statistics, todayKey())
   const combined: Partial<Record<CharacterId, number>> = { ...weeklyPoints }
   for (const [id, points] of Object.entries(todayPoints) as [CharacterId, number][]) {
+    combined[id] = (combined[id] ?? 0) + (points ?? 0)
+  }
+  // Duell-Bonuspunkte kommen live aus dem Backend dazu (Teil: Online-Duelle) - anders als der Rest
+  // der Wochenpunkte sind Duelle geräteübergreifend, siehe backend/wallet.ts.
+  for (const [id, points] of Object.entries(weeklyDuelBonus) as [CharacterId, number][]) {
     combined[id] = (combined[id] ?? 0) + (points ?? 0)
   }
 
@@ -108,8 +119,9 @@ export function WeeklyScreen() {
       </div>
       <p style={{ maxWidth: '32rem', fontSize: '0.68rem', opacity: 0.65, margin: 0 }}>
         Wochenpunkte = Summe der Tagespunkte (Hausnummer Platz 1-3 = 3/2/1, Tannenbaum Platz 1-3 = 6/4/2, plus
-        Achievement-Bonuspunkte). Noch nicht abgeschlossene (heutige) Punkte zählen hier schon live mit, werden aber
-        erst beim Tagesabschluss dauerhaft gespeichert.
+        Achievement-Bonuspunkte) plus Duell-Bonuspunkte (0,5 Punkte pro Teilnehmer ab dem zweiten, max. 2,5, für
+        gewonnene Duelle). Noch nicht abgeschlossene (heutige) Punkte zählen hier schon live mit, werden aber erst
+        beim Tagesabschluss dauerhaft gespeichert.
       </p>
 
       <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'center' }}>

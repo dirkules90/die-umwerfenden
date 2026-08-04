@@ -54,6 +54,9 @@ export function StartScreen() {
         <button className="btn secondary" onClick={() => goTo('shopSelect')}>
           Shop
         </button>
+        <button className="btn secondary" onClick={() => goTo('duelsSelect')}>
+          ⚔️ Duelle
+        </button>
         <button className="btn secondary" onClick={() => openSettings('start')}>
           Einstellungen
         </button>

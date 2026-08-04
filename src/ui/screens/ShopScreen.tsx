@@ -220,6 +220,13 @@ export function ShopScreen() {
       <button className="btn secondary screen-nav" onClick={() => goTo('start')}>
         ← Zurück
       </button>
+      <button
+        className="btn secondary"
+        style={{ position: 'absolute', top: 'env(safe-area-inset-top, 0.8rem)', right: '0.8rem' }}
+        onClick={() => goTo('coinHistory')}
+      >
+        📜 Historie
+      </button>
       <div className="shop-coins panel">🪙 {coins}</div>
 
       <div className="shop-title-row">

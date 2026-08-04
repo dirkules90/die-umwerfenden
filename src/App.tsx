@@ -7,6 +7,9 @@ import { WeeklyScreen } from './ui/screens/WeeklyScreen'
 import { AllTimeScreen } from './ui/screens/AllTimeScreen'
 import { SettingsScreen } from './ui/screens/SettingsScreen'
 import { ShopSelectScreen } from './ui/screens/ShopSelectScreen'
+import { DuelsSelectScreen } from './ui/screens/DuelsSelectScreen'
+import { DuelsScreen } from './ui/screens/DuelsScreen'
+import { CoinHistoryScreen } from './ui/screens/CoinHistoryScreen'
 import { AchievementBanner } from './ui/components/AchievementBanner'
 import { LoadingScreen } from './ui/components/LoadingScreen'
 
@@ -52,6 +55,12 @@ function ScreenRouter() {
           <ShopScreen />
         </Suspense>
       )
+    case 'duelsSelect':
+      return <DuelsSelectScreen />
+    case 'duels':
+      return <DuelsScreen />
+    case 'coinHistory':
+      return <CoinHistoryScreen />
     default:
       return <StartScreen />
   }
