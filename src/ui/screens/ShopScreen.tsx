@@ -53,6 +53,7 @@ export function ShopScreen() {
   const shopPlayer = useGameStore((s) => s.shopPlayer)
   const cosmetics = useGameStore((s) => s.cosmetics)
   const goTo = useGameStore((s) => s.goTo)
+  const requireLogin = useGameStore((s) => s.requireLogin)
   const setHairColor = useGameStore((s) => s.setHairColor)
   const equipOrBuyHairStyle = useGameStore((s) => s.equipOrBuyHairStyle)
   const equipOrBuyShirtStyle = useGameStore((s) => s.equipOrBuyShirtStyle)
@@ -84,7 +85,7 @@ export function ShopScreen() {
   const totalCount = totalPurchasableItemCount()
 
   useEffect(() => {
-    if (!shopPlayer) goTo('shopSelect')
+    if (!shopPlayer) requireLogin('shop')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shopPlayer])
 

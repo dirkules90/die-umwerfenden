@@ -12,6 +12,7 @@ const PIN_KEY = 'kegeln-lembeck:pins:v1'
 const COSMETICS_KEY = 'kegeln-lembeck:cosmetics:v1'
 const WEEKLY_KEY = 'kegeln-lembeck:weekly:v1'
 const WEEKLY_DUEL_BONUS_SYNCED_KEY = 'kegeln-lembeck:weekly-duel-bonus-synced:v1'
+const WEEKLY_LOGIN_DAYS_KEY = 'kegeln-lembeck:weekly-login-days:v1'
 const LOGIN_BONUS_KEY = 'kegeln-lembeck:login-bonus:v1'
 
 /** Start-PIN jedes Charakters, bis er/sie sie einmal persönlich ändert (Teil: Charakter-PIN,
@@ -35,6 +36,8 @@ export function emptyStatistics(): PlayerStatistics {
     achievements: [],
     currentStreak: 0,
     lastPlayedDate: null,
+    loginStreak: 0,
+    lastLoginStreakDate: null,
   }
 }
 
@@ -223,6 +226,28 @@ export function saveWeeklyDuelBonusSynced(synced: Partial<Record<CharacterId, nu
 
 export function resetWeeklyDuelBonusSynced(): void {
   localStorage.removeItem(WEEKLY_DUEL_BONUS_SYNCED_KEY)
+}
+
+/** An welchen Tagen (JJJJ-MM-TT) dieser Kalenderwoche sich ein Charakter schon eingeloggt hat
+ * (Teil: Engagement/Login-Streak) - Grundlage für das "Wochentreue"-Achievement (alle 7 Tage einer
+ * echten Montag-Sonntag-Woche eingeloggt). Reset erfolgt zusammen mit den übrigen Wochenwerten
+ * beim Wochenabschluss, siehe state/gameStore.ts processDailyAndWeeklyRollover. */
+export function loadWeeklyLoginDays(): Partial<Record<CharacterId, string[]>> {
+  try {
+    const raw = localStorage.getItem(WEEKLY_LOGIN_DAYS_KEY)
+    if (!raw) return {}
+    return JSON.parse(raw)
+  } catch {
+    return {}
+  }
+}
+
+export function saveWeeklyLoginDays(days: Partial<Record<CharacterId, string[]>>): void {
+  localStorage.setItem(WEEKLY_LOGIN_DAYS_KEY, JSON.stringify(days))
+}
+
+export function resetWeeklyLoginDays(): void {
+  localStorage.removeItem(WEEKLY_LOGIN_DAYS_KEY)
 }
 
 /** Letztes Datum (JJJJ-MM-TT), an dem ein Charakter den Tages-Login-Bonus bereits bekommen hat

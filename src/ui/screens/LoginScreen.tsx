@@ -3,13 +3,18 @@ import { useGameStore } from '../../state/gameStore'
 import { AVATAR_CONFIGS, CHARACTER_ORDER } from '../../characters/avatarConfigs'
 import { PinGate } from '../components/PinGate'
 import { AmbientBackground } from '../components/AmbientBackground'
+import type { CharacterId } from '../../game/types'
 
-export function PlayerSelectScreen() {
-  const selectedPlayer = useGameStore((s) => s.selectedPlayer)
-  const selectPlayer = useGameStore((s) => s.selectPlayer)
+/** Zentraler Login-Bildschirm (Teil: Zentrales Login) - ersetzt die früher getrennten PIN-Abfragen
+ * vor Spielen/Shop/Duelle. Einmal hier eingeloggt, gilt currentPlayer geräteweit weiter (siehe
+ * requireLogin/completeLogin in state/gameStore.ts), bis explizit gewechselt wird (StartScreen
+ * "Wechseln"). Erreicht wird dieser Screen ausschließlich über requireLogin. */
+export function LoginScreen() {
   const goTo = useGameStore((s) => s.goTo)
   const statistics = useGameStore((s) => s.statistics)
-  const [pinGateOpen, setPinGateOpen] = useState(false)
+  const completeLogin = useGameStore((s) => s.completeLogin)
+  const [selected, setSelected] = useState<CharacterId | null>(null)
+  const [pinFor, setPinFor] = useState<CharacterId | null>(null)
 
   return (
     <div className="screen">
@@ -18,19 +23,21 @@ export function PlayerSelectScreen() {
         ← Zurück
       </button>
       <h2 style={{ margin: 0 }}>Wer bist du?</h2>
-      <p className="subtitle">Wähle deinen Charakter, um deine eigene Hausnummer zu spielen.</p>
+      <p className="subtitle">Einmal einloggen reicht - danach geht's direkt weiter zu Spielen, Shop und Duelle.</p>
       <div className="char-grid">
         {CHARACTER_ORDER.map((id) => {
           const config = AVATAR_CONFIGS[id]
-          const selected = selectedPlayer === id
           // Streak-Badge (Teil: Engagement) - erst ab 2 Tagen gezeigt, damit ein frisch gestartetes
           // "🔥1" nicht wie Grundrauschen für jeden aussieht, der heute zum ersten Mal spielt.
           const streak = statistics[id]?.currentStreak ?? 0
           return (
             <button
               key={id}
-              className={`char-tile ${selected ? 'selected' : ''}`}
-              onClick={() => selectPlayer(id)}
+              className={`char-tile ${selected === id ? 'selected' : ''}`}
+              onClick={() => {
+                setSelected(id)
+                setPinFor(id)
+              }}
             >
               <img src={config.photoUrl} alt={config.name} />
               <span className="name">{config.name}</span>
@@ -39,19 +46,19 @@ export function PlayerSelectScreen() {
           )
         })}
       </div>
-      <button className="btn" disabled={!selectedPlayer} onClick={() => setPinGateOpen(true)}>
-        Los geht&apos;s
-      </button>
 
-      {pinGateOpen && selectedPlayer && (
+      {pinFor && (
         <PinGate
-          characterId={selectedPlayer}
-          characterName={AVATAR_CONFIGS[selectedPlayer].name}
+          characterId={pinFor}
+          characterName={AVATAR_CONFIGS[pinFor].name}
           onSuccess={() => {
-            setPinGateOpen(false)
-            goTo('modeSelect')
+            setPinFor(null)
+            completeLogin(pinFor)
           }}
-          onCancel={() => setPinGateOpen(false)}
+          onCancel={() => {
+            setPinFor(null)
+            setSelected(null)
+          }}
         />
       )}
     </div>

@@ -92,6 +92,9 @@ import {
   loadRawWeekly,
   loadWeeklyDuelBonusSynced,
   saveWeeklyDuelBonusSynced,
+  loadWeeklyLoginDays,
+  saveWeeklyLoginDays,
+  resetWeeklyLoginDays,
   loadSettings,
   resetAllStatistics,
   resetAllTimeBoard,
@@ -130,16 +133,14 @@ import {
 
 export type Screen =
   | 'start'
-  | 'playerSelect'
+  | 'login'
   | 'modeSelect'
   | 'game'
   | 'tannenbaum'
   | 'weekly'
   | 'allTime'
   | 'settings'
-  | 'shopSelect'
   | 'shop'
-  | 'duelsSelect'
   | 'duels'
   | 'coinHistory'
 
@@ -164,6 +165,15 @@ interface AchievementBanner {
 interface GameStore {
   screen: Screen
   settingsReturnTo: Screen
+  /** Wer dieses Gerät gerade benutzt (Teil: Zentrales Login) - einmal per PIN gesetzt, gilt dann
+   * geräteweit für Spiel/Shop/Duelle, bis explizit gewechselt wird (siehe logout). Getrennt von
+   * selectedPlayer/shopPlayer/duelsPlayer, die aus Kompatibilitätsgründen weiter existieren (die
+   * einzelnen Bereiche lesen weiterhin diese), aber von completeLogin immer synchron mitgesetzt
+   * werden. */
+  currentPlayer: CharacterId | null
+  /** Zielbildschirm, zu dem nach einem noch ausstehenden Login weitergeleitet wird (Teil:
+   * Zentrales Login) - siehe requireLogin/LoginScreen. */
+  pendingAfterLogin: Screen
   selectedPlayer: CharacterId | null
   session: GameSession | null
   tannenbaumSession: TannenbaumSession | null
@@ -201,8 +211,8 @@ interface GameStore {
   lastGameCoins: number | null
   pauseMenuOpen: boolean
 
-  /** Charakter, für den der Duelle-Bereich gerade geöffnet ist (Teil: Online-Duelle) - analog zu
-   * shopPlayer, per PIN-Gate ausgewählt (siehe DuelsSelectScreen). */
+  /** Charakter, für den der Duelle-Bereich gerade geöffnet ist (Teil: Online-Duelle) - wird beim
+   * zentralen Login synchron mit currentPlayer gesetzt (siehe completeLogin). */
   duelsPlayer: CharacterId | null
   duels: Duel[]
   duelsLoading: boolean
@@ -218,10 +228,25 @@ interface GameStore {
    * weeklyPoints-Summe eingerechnet, damit er auch bei Wochensieger-Ermittlung und
    * Allzeit-Übernahme (siehe processDailyAndWeeklyRollover) ganz normal mitzählt. */
   weeklyDuelBonusSynced: Partial<Record<CharacterId, number>>
+  /** An welchen Tagen dieser Kalenderwoche sich welcher Charakter schon eingeloggt hat (Teil:
+   * Engagement/Login-Streak) - Grundlage für das 'wochentreue'-Achievement, siehe verifyPin. */
+  weeklyLoginDays: Partial<Record<CharacterId, string[]>>
 
   goTo: (screen: Screen) => void
   setPauseMenuOpen: (open: boolean) => void
   openSettings: (from: Screen) => void
+  /** Leitet zum zentralen Login um, falls noch niemand eingeloggt ist, sonst direkt zum
+   * Zielbildschirm (Teil: Zentrales Login) - der gemeinsame Einstiegspunkt für die drei
+   * personalisierten Bereiche Spielen/Shop/Duelle auf dem Start-Bildschirm. */
+  requireLogin: (target: Screen) => void
+  /** Schließt den zentralen Login ab: setzt currentPlayer + die drei Bereichs-Felder synchron und
+   * geht zum hinterlegten pendingAfterLogin weiter (Teil: Zentrales Login). Die eigentliche
+   * PIN-Prüfung läuft weiterhin über PinGate/verifyPin, das hier nur nach deren Erfolg läuft. */
+  completeLogin: (id: CharacterId) => void
+  /** Für einen Charakterwechsel auf einem gemeinsam genutzten Gerät (Teil: Zentrales Login) - wirft
+   * niemanden "raus", sondern sorgt nur dafür, dass der nächste personalisierte Bereich wieder nach
+   * PIN fragt. */
+  logout: () => void
   selectPlayer: (id: CharacterId) => void
   verifyPin: (id: CharacterId, pin: string) => boolean
   changePin: (id: CharacterId, oldPin: string, newPin: string) => boolean
@@ -326,6 +351,14 @@ function updateStreak(ps: PlayerStatistics): PlayerStatistics {
   return { ...ps, currentStreak, lastPlayedDate: today }
 }
 
+/** Analog zu updateStreak, aber fürs bloße Einloggen statt fürs tatsächliche Spielen (Teil:
+ * Engagement/Login-Streak, siehe game/achievements.ts 'dranbleiber'). Aufrufer (verifyPin) ruft
+ * dies nur beim ERSTEN Login eines Tages auf, ein "today" hier ist also garantiert ein neuer Tag. */
+function updateLoginStreak(ps: PlayerStatistics, today: string): PlayerStatistics {
+  const loginStreak = ps.lastLoginStreakDate && isNextDay(ps.lastLoginStreakDate, today) ? ps.loginStreak + 1 : 1
+  return { ...ps, loginStreak, lastLoginStreakDate: today }
+}
+
 /** Exklusive Wochensieger-Krone (Teil: Shop-Erweiterung) - nicht käuflich, wird nur hier beim
  * Wochenabschluss vergeben. Bereits besitzende Wochensieger behalten sie über weitere Siege hinweg
  * natürlich (kein erneutes Eintragen nötig, aber auch kein Schaden). */
@@ -366,6 +399,7 @@ function processDailyAndWeeklyRollover(): {
   weekKey: string
   weeklyPoints: Partial<Record<CharacterId, number>>
   weeklyDuelBonusSynced: Partial<Record<CharacterId, number>>
+  weeklyLoginDays: Partial<Record<CharacterId, string[]>>
 } {
   const statistics = loadAllStatistics()
   let allTimeBoard = loadAllTimeBoard()
@@ -376,6 +410,7 @@ function processDailyAndWeeklyRollover(): {
   let weekKey = rawWeekly?.weekKey ?? currentWeekKey()
   let weeklyPoints = rawWeekly?.points ?? {}
   let weeklyDuelBonusSynced = loadWeeklyDuelBonusSynced()
+  let weeklyLoginDays = loadWeeklyLoginDays()
 
   let dailyRecords: DailyRecords = raw?.records ?? {}
 
@@ -419,10 +454,23 @@ function processDailyAndWeeklyRollover(): {
     // für die neue Woche wieder bei 0 starten (siehe syncWeeklyDuelBonus).
     weeklyDuelBonusSynced = {}
     saveWeeklyDuelBonusSynced(weeklyDuelBonusSynced)
+    // Neue Woche, neue Chance auf "Wochentreue" (Teil: Engagement/Login-Streak) - die
+    // Kalendertag-Streak (loginStreak in PlayerStatistics) läuft davon unabhängig einfach weiter.
+    weeklyLoginDays = {}
+    saveWeeklyLoginDays(weeklyLoginDays)
   }
 
   saveWeeklyRecords(weekKey, weeklyPoints)
-  return { statistics, dailyRecords, allTimeBoard, allTimeWeeklyWins, weekKey, weeklyPoints, weeklyDuelBonusSynced }
+  return {
+    statistics,
+    dailyRecords,
+    allTimeBoard,
+    allTimeWeeklyWins,
+    weekKey,
+    weeklyPoints,
+    weeklyDuelBonusSynced,
+    weeklyLoginDays,
+  }
 }
 
 const initialDailyState = processDailyAndWeeklyRollover()
@@ -430,6 +478,8 @@ const initialDailyState = processDailyAndWeeklyRollover()
 export const useGameStore = create<GameStore>((set, get) => ({
   screen: 'start',
   settingsReturnTo: 'start',
+  currentPlayer: null,
+  pendingAfterLogin: 'start',
   selectedPlayer: null,
   session: null,
   tannenbaumSession: null,
@@ -440,6 +490,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   weekKey: initialDailyState.weekKey,
   weeklyPoints: initialDailyState.weeklyPoints,
   weeklyDuelBonusSynced: initialDailyState.weeklyDuelBonusSynced,
+  weeklyLoginDays: initialDailyState.weeklyLoginDays,
   pins: loadPins(),
   loginBonusDates: loadLoginBonusDates(),
   cosmetics: loadAllCosmetics(),
@@ -478,27 +529,79 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({ selectedPlayer: id })
   },
 
+  requireLogin: (target) => {
+    if (get().currentPlayer) {
+      get().goTo(target)
+      return
+    }
+    set({ pendingAfterLogin: target })
+    get().goTo('login')
+  },
+
+  completeLogin: (id) => {
+    set({ currentPlayer: id, selectedPlayer: id, shopPlayer: id, duelsPlayer: id })
+    get().goTo(get().pendingAfterLogin)
+  },
+
+  logout: () => {
+    soundManager.playButtonClick()
+    set({ currentPlayer: null, selectedPlayer: null, shopPlayer: null, duelsPlayer: null })
+  },
+
   verifyPin: (id, pin) => {
     const stored = get().pins[id] ?? DEFAULT_PIN
     if (stored !== pin) return false
 
     // Tages-Login-Bonus (Teil: Engagement): ein paar Münzen fürs erste erfolgreiche Einloggen an
     // diesem Tag, unabhängig davon ob danach tatsächlich gespielt wird. verifyPin ist bewusst der
-    // gemeinsame Ort dafür, weil sowohl Spieler- als auch Shop-Auswahl darüber laufen (PinGate) -
-    // so gilt der Bonus für "heute überhaupt reingeschaut" statt nur für einen der beiden Wege.
+    // gemeinsame Ort dafür, weil Login jetzt zentral über LoginScreen läuft (siehe requireLogin) -
+    // so gilt der Bonus für "heute überhaupt reingeschaut" statt an einen einzelnen Bereich
+    // gebunden zu sein.
     const today = todayKey()
-    if (get().loginBonusDates[id] !== today) {
-      const cosmetics = addCoins(get().cosmetics, id, LOGIN_BONUS_COINS, 'login_bonus')
-      saveAllCosmetics(cosmetics)
-      const loginBonusDates = { ...get().loginBonusDates, [id]: today }
-      saveLoginBonusDates(loginBonusDates)
-      soundManager.playCoinGain()
-      set({
-        cosmetics,
-        loginBonusDates,
-        achievementBanner: { playerId: id, title: 'Willkommen zurück', coins: LOGIN_BONUS_COINS, kind: 'login' },
-      })
+    if (get().loginBonusDates[id] === today) return true
+
+    let cosmetics = addCoins(get().cosmetics, id, LOGIN_BONUS_COINS, 'login_bonus')
+    soundManager.playCoinGain()
+    let banner: AchievementBanner = { playerId: id, title: 'Willkommen zurück', coins: LOGIN_BONUS_COINS, kind: 'login' }
+
+    const loginBonusDates = { ...get().loginBonusDates, [id]: today }
+    saveLoginBonusDates(loginBonusDates)
+
+    // Login-Streaks (Teil: Engagement/Login-Streak, siehe game/achievements.ts 'dranbleiber' /
+    // 'wochentreue') - nur an einem tatsächlich neuen Login-Tag fortgeschrieben (siehe frühes
+    // return oben), sonst würde mehrfaches Einloggen am selben Tag die Streak künstlich aufblähen.
+    let ps = statsFor(get().statistics, id)
+    ps = updateLoginStreak(ps, today)
+
+    function grantLoginAchievement(psIn: PlayerStatistics, achId: string, title: string): PlayerStatistics {
+      const isWeeklyChallenge = achId === weeklyChallengeIdFor(currentWeekKey())
+      const achCoins = achievementCoinReward(achId) + (isWeeklyChallenge ? WEEKLY_CHALLENGE_BONUS_COINS : 0)
+      cosmetics = addCoins(cosmetics, id, achCoins, 'achievement', { achievementId: achId })
+      banner = { playerId: id, title: isWeeklyChallenge ? `${title} (Wochenaufgabe!)` : title, coins: achCoins }
+      window.setTimeout(() => soundManager.playCoinGain(), 250)
+      return grantAchievement(psIn, achId)
     }
+
+    if (ps.loginStreak >= 3 && !hasAchievementThisWeek(ps, 'dranbleiber', currentWeekKey())) {
+      ps = grantLoginAchievement(ps, 'dranbleiber', 'Dranbleiber')
+    }
+
+    let weeklyLoginDays = get().weeklyLoginDays
+    const daysThisWeek = weeklyLoginDays[id] ?? []
+    if (!daysThisWeek.includes(today)) {
+      const updatedDays = [...daysThisWeek, today]
+      weeklyLoginDays = { ...weeklyLoginDays, [id]: updatedDays }
+      if (updatedDays.length >= 7 && !hasAchievementThisWeek(ps, 'wochentreue', currentWeekKey())) {
+        ps = grantLoginAchievement(ps, 'wochentreue', 'Wochentreue')
+      }
+    }
+
+    const statistics = { ...get().statistics, [id]: ps }
+    saveAllStatistics(statistics)
+    saveAllCosmetics(cosmetics)
+    saveWeeklyLoginDays(weeklyLoginDays)
+
+    set({ cosmetics, loginBonusDates, statistics, weeklyLoginDays, achievementBanner: banner })
     return true
   },
 
@@ -1160,6 +1263,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     resetAllTimeWeeklyWins()
     resetWeeklyRecords()
     resetWeeklyDuelBonusSynced()
+    resetWeeklyLoginDays()
     saveLoginBonusDates({})
     set({
       statistics: {} as Record<CharacterId, PlayerStatistics>,
@@ -1169,6 +1273,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       weekKey: currentWeekKey(),
       weeklyPoints: {},
       weeklyDuelBonusSynced: {},
+      weeklyLoginDays: {},
       loginBonusDates: {},
     })
   },

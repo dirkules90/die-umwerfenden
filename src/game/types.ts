@@ -117,6 +117,12 @@ export interface PlayerStatistics {
   currentStreak: number
   /** Letzter Tag (JJJJ-MM-TT), an dem eine Partie beendet wurde - Grundlage für currentStreak. */
   lastPlayedDate: string | null
+  /** Anzahl aufeinanderfolgender Kalendertage mit mindestens einem Login (Teil: Engagement/
+   * Login-Streak) - analog zu currentStreak, aber fürs bloße Einloggen statt fürs tatsächliche
+   * Spielen, siehe state/gameStore.ts updateLoginStreak. */
+  loginStreak: number
+  /** Letzter Tag (JJJJ-MM-TT), an dem ein Login gezählt wurde - Grundlage für loginStreak. */
+  lastLoginStreakDate: string | null
 }
 
 export interface Settings {

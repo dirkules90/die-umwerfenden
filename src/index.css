@@ -1136,3 +1136,76 @@ h3 {
   flex: 1;
   text-align: left;
 }
+
+/* Horizontal scrollbare Gegner-Auswahl statt starrem 6-Spalten-Grid (Teil: Duell-Formular) - das
+   Formular-Panel ist schmaler als die vollen Charakter-Auswahl-Screens, ein festes 6-Spalten-Grid
+   (siehe .char-grid) würde dort über den Panel-Rand hinauslaufen statt sauber umzubrechen. */
+.duel-opponent-row {
+  display: flex;
+  gap: 0.7rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: 0.2rem 0.1rem 0.5rem;
+  width: 100%;
+}
+
+.duel-opponent-row .char-tile {
+  flex: 0 0 auto;
+  width: 5.2rem;
+}
+
+.char-tile.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.duel-opponent-zero {
+  font-size: 0.65rem;
+  opacity: 0.8;
+}
+
+.duel-form-row--stake {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.duel-stake-slider {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+}
+
+.duel-stake-slider input[type='range'] {
+  flex: 1;
+}
+
+.duel-stake-slider strong {
+  min-width: 3.5rem;
+  text-align: right;
+}
+
+/* Eingeloggt-Anzeige auf dem Start-Bildschirm (Teil: Zentrales Login). */
+.current-player-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  padding: 0.3rem 0.5rem 0.3rem 0.3rem;
+  font-size: 0.85rem;
+}
+
+.current-player-badge img {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.current-player-badge .btn {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.75rem;
+}

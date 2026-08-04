@@ -1,13 +1,11 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { useGameStore } from './state/gameStore'
 import { StartScreen } from './ui/screens/StartScreen'
-import { PlayerSelectScreen } from './ui/screens/PlayerSelectScreen'
+import { LoginScreen } from './ui/screens/LoginScreen'
 import { ModeSelectScreen } from './ui/screens/ModeSelectScreen'
 import { WeeklyScreen } from './ui/screens/WeeklyScreen'
 import { AllTimeScreen } from './ui/screens/AllTimeScreen'
 import { SettingsScreen } from './ui/screens/SettingsScreen'
-import { ShopSelectScreen } from './ui/screens/ShopSelectScreen'
-import { DuelsSelectScreen } from './ui/screens/DuelsSelectScreen'
 import { DuelsScreen } from './ui/screens/DuelsScreen'
 import { CoinHistoryScreen } from './ui/screens/CoinHistoryScreen'
 import { AchievementBanner } from './ui/components/AchievementBanner'
@@ -25,8 +23,8 @@ function ScreenRouter() {
   switch (screen) {
     case 'start':
       return <StartScreen />
-    case 'playerSelect':
-      return <PlayerSelectScreen />
+    case 'login':
+      return <LoginScreen />
     case 'modeSelect':
       return <ModeSelectScreen />
     case 'game':
@@ -47,16 +45,12 @@ function ScreenRouter() {
       return <AllTimeScreen />
     case 'settings':
       return <SettingsScreen />
-    case 'shopSelect':
-      return <ShopSelectScreen />
     case 'shop':
       return (
         <Suspense fallback={<LoadingScreen label="Lade Shop…" />}>
           <ShopScreen />
         </Suspense>
       )
-    case 'duelsSelect':
-      return <DuelsSelectScreen />
     case 'duels':
       return <DuelsScreen />
     case 'coinHistory':

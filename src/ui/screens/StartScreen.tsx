@@ -15,6 +15,9 @@ export function StartScreen() {
   const goTo = useGameStore((s) => s.goTo)
   const openSettings = useGameStore((s) => s.openSettings)
   const statistics = useGameStore((s) => s.statistics)
+  const currentPlayer = useGameStore((s) => s.currentPlayer)
+  const requireLogin = useGameStore((s) => s.requireLogin)
+  const logout = useGameStore((s) => s.logout)
   const { isFullscreen, supported, isStandalone, isIOS } = useFullscreen()
 
   const weekKey = currentWeekKey()
@@ -30,6 +33,15 @@ export function StartScreen() {
       <AmbientBackground />
       <img className="title-logo-img" src={`${import.meta.env.BASE_URL}icons/logo.png`} alt="Die Umwerfenden" />
       <p className="subtitle">Die originalgetreue Outdoor-Kegelbahn aus Lembeck.</p>
+      {currentPlayer && (
+        <div className="current-player-badge">
+          <img src={AVATAR_CONFIGS[currentPlayer].photoUrl} alt={AVATAR_CONFIGS[currentPlayer].name} />
+          <span>Eingeloggt als {AVATAR_CONFIGS[currentPlayer].name}</span>
+          <button className="btn secondary" onClick={logout}>
+            Wechseln
+          </button>
+        </div>
+      )}
       <div className="panel daily-challenge-panel">
         <div className="daily-challenge-title">🎯 Wochenaufgabe: {challenge.title}</div>
         <p className="subtitle" style={{ margin: 0, fontSize: '0.9rem' }}>
@@ -44,17 +56,17 @@ export function StartScreen() {
           </div>
         )}
       </div>
-      <button className="btn" onClick={() => goTo('playerSelect')}>
+      <button className="btn" onClick={() => requireLogin('modeSelect')}>
         Neues Spiel
       </button>
       <div style={{ display: 'flex', gap: '0.8rem' }}>
         <button className="btn secondary" onClick={() => goTo('weekly')}>
           Bestenliste
         </button>
-        <button className="btn secondary" onClick={() => goTo('shopSelect')}>
+        <button className="btn secondary" onClick={() => requireLogin('shop')}>
           Shop
         </button>
-        <button className="btn secondary" onClick={() => goTo('duelsSelect')}>
+        <button className="btn secondary" onClick={() => requireLogin('duels')}>
           ⚔️ Duelle
         </button>
         <button className="btn secondary" onClick={() => openSettings('start')}>

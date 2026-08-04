@@ -43,6 +43,20 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
     bonusPoints: 0.5,
     coinReward: 10,
   },
+  {
+    id: 'dranbleiber',
+    title: 'Dranbleiber',
+    description: 'Drei Kalendertage in Folge eingeloggt (egal an welchen Wochentagen)',
+    bonusPoints: 1,
+    coinReward: 15,
+  },
+  {
+    id: 'wochentreue',
+    title: 'Wochentreue',
+    description: 'An jedem Tag einer kompletten Kalenderwoche (Montag bis Sonntag) eingeloggt',
+    bonusPoints: 2,
+    coinReward: 30,
+  },
 ]
 
 function coinRewardFor(id: string): number {

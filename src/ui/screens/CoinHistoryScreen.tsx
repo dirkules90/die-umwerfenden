@@ -46,11 +46,12 @@ export function CoinHistoryScreen() {
   const coinHistoryLoading = useGameStore((s) => s.coinHistoryLoading)
   const loadCoinHistory = useGameStore((s) => s.loadCoinHistory)
   const goTo = useGameStore((s) => s.goTo)
+  const requireLogin = useGameStore((s) => s.requireLogin)
 
   useEffect(() => {
     if (shopPlayer) void loadCoinHistory(shopPlayer)
-    else goTo('shopSelect')
-  }, [shopPlayer, loadCoinHistory, goTo])
+    else requireLogin('shop')
+  }, [shopPlayer, loadCoinHistory, requireLogin])
 
   if (!shopPlayer) return null
 

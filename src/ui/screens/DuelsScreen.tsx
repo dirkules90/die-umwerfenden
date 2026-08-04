@@ -33,6 +33,7 @@ export function DuelsScreen() {
   const duelError = useGameStore((s) => s.duelError)
   const cosmetics = useGameStore((s) => s.cosmetics)
   const goTo = useGameStore((s) => s.goTo)
+  const requireLogin = useGameStore((s) => s.requireLogin)
   const loadDuels = useGameStore((s) => s.loadDuels)
   const createDuelRequest = useGameStore((s) => s.createDuelRequest)
   const respondToDuelRequest = useGameStore((s) => s.respondToDuelRequest)
@@ -44,13 +45,13 @@ export function DuelsScreen() {
   const [opponents, setOpponents] = useState<CharacterId[]>([])
   const [mode, setMode] = useState<DuelMode>('hausnummer_hoch')
   const [splitMode, setSplitMode] = useState<DuelSplitMode>('winner_takes_all')
-  const [stake, setStake] = useState(20)
+  const [stake, setStake] = useState(0)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     if (duelsPlayer) void loadDuels()
-    else goTo('duelsSelect')
-  }, [duelsPlayer, loadDuels, goTo])
+    else requireLogin('duels')
+  }, [duelsPlayer, loadDuels, requireLogin])
 
   const sorted = useMemo(() => {
     function rank(d: Duel): number {
@@ -64,9 +65,30 @@ export function DuelsScreen() {
     return [...duels].sort((a, b) => rank(a) - rank(b))
   }, [duels, duelsPlayer])
 
+  const coins = duelsPlayer ? cosmeticsFor(cosmetics, duelsPlayer).coins : 0
+  // Höchster Einsatz, den JEDER Teilnehmer sich leisten kann (Teil: Duell-Formular) - ohne
+  // ausgewählte Gegner nur durch den eigenen Kontostand begrenzt, mit Gegnern zusätzlich durch
+  // deren (auf diesem Gerät bekannten) Kontostand, siehe Nutzer-Feedback "Schieberegler soll sich
+  // auf das Minimum aller Beteiligten anpassen".
+  const maxStake = opponents.reduce(
+    (max, id) => Math.min(max, cosmeticsFor(cosmetics, id).coins),
+    coins,
+  )
+
+  // Beim Öffnen des Formulars startet der Regler auf dem vollen aktuellen Maximum (Teil:
+  // Duell-Formular) - danach nur noch nach unten gekappt, wenn das Maximum durch eine
+  // Gegner-Auswahl sinkt (siehe nächster Effekt), nie automatisch wieder hochgesetzt.
+  useEffect(() => {
+    if (showCreate) setStake(maxStake)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showCreate])
+
+  useEffect(() => {
+    setStake((s) => Math.min(s, maxStake))
+  }, [maxStake])
+
   if (!duelsPlayer) return null
 
-  const coins = cosmeticsFor(cosmetics, duelsPlayer).coins
   const totalParticipants = opponents.length + 1
   const splitOptions: DuelSplitMode[] = ['winner_takes_all']
   if (totalParticipants >= 4) splitOptions.push('top2')
@@ -86,7 +108,6 @@ export function DuelsScreen() {
     if (ok) {
       setShowCreate(false)
       setOpponents([])
-      setStake(20)
       setSplitMode('winner_takes_all')
     }
   }
@@ -131,19 +152,26 @@ export function DuelsScreen() {
         <div className="panel duel-create-panel">
           <h3 style={{ marginTop: 0 }}>Neues Duell</h3>
           <p style={{ fontSize: '0.8rem', opacity: 0.75, margin: '0 0 0.6rem' }}>Gegner auswählen (mehrere möglich):</p>
-          <div className="char-grid">
-            {otherCharacters.map((id) => (
-              <button
-                key={id}
-                className={`char-tile ${opponents.includes(id) ? 'selected' : ''}`}
-                onClick={() =>
-                  setOpponents((prev) => (prev.includes(id) ? prev.filter((o) => o !== id) : [...prev, id]))
-                }
-              >
-                <img src={AVATAR_CONFIGS[id].photoUrl} alt={AVATAR_CONFIGS[id].name} />
-                <span className="name">{AVATAR_CONFIGS[id].name}</span>
-              </button>
-            ))}
+          <div className="duel-opponent-row">
+            {otherCharacters.map((id) => {
+              const opponentCoins = cosmeticsFor(cosmetics, id).coins
+              const disabled = opponentCoins <= 0
+              return (
+                <button
+                  key={id}
+                  className={`char-tile ${opponents.includes(id) ? 'selected' : ''} ${disabled ? 'disabled' : ''}`}
+                  disabled={disabled}
+                  title={disabled ? `${AVATAR_CONFIGS[id].name} hat keine Münzen` : undefined}
+                  onClick={() =>
+                    setOpponents((prev) => (prev.includes(id) ? prev.filter((o) => o !== id) : [...prev, id]))
+                  }
+                >
+                  <img src={AVATAR_CONFIGS[id].photoUrl} alt={AVATAR_CONFIGS[id].name} />
+                  <span className="name">{AVATAR_CONFIGS[id].name}</span>
+                  {disabled && <span className="duel-opponent-zero">0 🪙</span>}
+                </button>
+              )
+            })}
           </div>
 
           <div className="duel-form-row">
@@ -157,16 +185,25 @@ export function DuelsScreen() {
             </select>
           </div>
 
-          <div className="duel-form-row">
-            <label>Einsatz je Teilnehmer (🪙)</label>
-            <input
-              type="number"
-              min={1}
-              max={coins}
-              value={stake}
-              onChange={(e) => setStake(Math.max(1, Math.min(coins, Number(e.target.value))))}
-            />
+          <div className="duel-form-row duel-form-row--stake">
+            <label>Einsatz je Teilnehmer</label>
+            <div className="duel-stake-slider">
+              <input
+                type="range"
+                min={0}
+                max={Math.max(maxStake, 1)}
+                value={Math.min(stake, maxStake)}
+                disabled={maxStake <= 0}
+                onChange={(e) => setStake(Number(e.target.value))}
+              />
+              <strong>{stake} 🪙</strong>
+            </div>
           </div>
+          {maxStake <= 0 && (
+            <p style={{ fontSize: '0.75rem', color: '#ff8a80', margin: 0 }}>
+              Kein Einsatz möglich - {opponents.length > 0 ? 'ein ausgewählter Gegner hat' : 'du hast'} 0 Münzen.
+            </p>
+          )}
 
           {splitOptions.length > 1 && (
             <div className="duel-form-row">
@@ -189,7 +226,7 @@ export function DuelsScreen() {
           </p>
 
           <div style={{ display: 'flex', gap: '0.6rem' }}>
-            <button className="btn" disabled={busy || opponents.length === 0 || stake > coins} onClick={handleCreate}>
+            <button className="btn" disabled={busy || opponents.length === 0 || stake <= 0} onClick={handleCreate}>
               Herausfordern
             </button>
             <button className="btn secondary" onClick={() => setShowCreate(false)}>

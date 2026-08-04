@@ -20,7 +20,7 @@ export function ModeSelectScreen() {
   return (
     <div className="screen">
       <AmbientBackground />
-      <button className="btn secondary screen-nav" onClick={() => goTo('playerSelect')}>
+      <button className="btn secondary screen-nav" onClick={() => goTo('start')}>
         ← Zurück
       </button>
       <h2 style={{ margin: 0 }}>Spielmodus</h2>
