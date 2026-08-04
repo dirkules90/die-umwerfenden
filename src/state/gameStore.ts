@@ -90,12 +90,15 @@ import {
   loadPins,
   loadRawDaily,
   loadRawWeekly,
+  loadWeeklyDuelBonusSynced,
+  saveWeeklyDuelBonusSynced,
   loadSettings,
   resetAllStatistics,
   resetAllTimeBoard,
   resetAllTimeWeeklyWins,
   resetDailyRecords,
   resetWeeklyRecords,
+  resetWeeklyDuelBonusSynced,
   saveAllCosmetics,
   saveAllStatistics,
   saveAllTimeBoard,
@@ -209,10 +212,12 @@ interface GameStore {
   activeDuelId: string | null
   coinHistory: CoinTransactionRow[]
   coinHistoryLoading: boolean
-  /** Wochenpunkte-Bonus aus gewonnenen Duellen dieser Kalenderwoche (Teil: Wochenbewertung) - lebt
-   * im Backend statt lokal, weil Duelle geräteübergreifend sind (siehe backend/wallet.ts). Wird on
-   * demand für die aktuell betrachtete Bestenliste nachgeladen, siehe loadWeeklyDuelBonus. */
-  weeklyDuelBonus: Partial<Record<CharacterId, number>>
+  /** Wie viel Duell-Wochenbonus je Charakter bereits in weeklyPoints eingerechnet wurde (Teil:
+   * Wochenbewertung) - der Bonus selbst lebt im Backend (siehe backend/wallet.ts), weil Duelle
+   * geräteübergreifend sind, wird aber per syncWeeklyDuelBonus in die ganz normale lokale
+   * weeklyPoints-Summe eingerechnet, damit er auch bei Wochensieger-Ermittlung und
+   * Allzeit-Übernahme (siehe processDailyAndWeeklyRollover) ganz normal mitzählt. */
+  weeklyDuelBonusSynced: Partial<Record<CharacterId, number>>
 
   goTo: (screen: Screen) => void
   setPauseMenuOpen: (open: boolean) => void
@@ -262,7 +267,7 @@ interface GameStore {
   dismissDuelNotification: (duelId: string) => Promise<void>
   startDuelGame: (duel: Duel) => void
   loadCoinHistory: (id: CharacterId) => Promise<void>
-  loadWeeklyDuelBonus: () => Promise<void>
+  syncWeeklyDuelBonus: () => Promise<void>
 }
 
 function statsFor(store: Record<CharacterId, PlayerStatistics>, id: CharacterId): PlayerStatistics {
@@ -360,6 +365,7 @@ function processDailyAndWeeklyRollover(): {
   allTimeWeeklyWins: Partial<Record<CharacterId, number>>
   weekKey: string
   weeklyPoints: Partial<Record<CharacterId, number>>
+  weeklyDuelBonusSynced: Partial<Record<CharacterId, number>>
 } {
   const statistics = loadAllStatistics()
   let allTimeBoard = loadAllTimeBoard()
@@ -369,6 +375,7 @@ function processDailyAndWeeklyRollover(): {
   const rawWeekly = loadRawWeekly()
   let weekKey = rawWeekly?.weekKey ?? currentWeekKey()
   let weeklyPoints = rawWeekly?.points ?? {}
+  let weeklyDuelBonusSynced = loadWeeklyDuelBonusSynced()
 
   let dailyRecords: DailyRecords = raw?.records ?? {}
 
@@ -408,10 +415,14 @@ function processDailyAndWeeklyRollover(): {
     }
     weekKey = currentWeekKey()
     weeklyPoints = {}
+    // Neue Woche, neue Zählung: welcher Duell-Bonus schon in weeklyPoints eingerechnet wurde, muss
+    // für die neue Woche wieder bei 0 starten (siehe syncWeeklyDuelBonus).
+    weeklyDuelBonusSynced = {}
+    saveWeeklyDuelBonusSynced(weeklyDuelBonusSynced)
   }
 
   saveWeeklyRecords(weekKey, weeklyPoints)
-  return { statistics, dailyRecords, allTimeBoard, allTimeWeeklyWins, weekKey, weeklyPoints }
+  return { statistics, dailyRecords, allTimeBoard, allTimeWeeklyWins, weekKey, weeklyPoints, weeklyDuelBonusSynced }
 }
 
 const initialDailyState = processDailyAndWeeklyRollover()
@@ -428,6 +439,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   allTimeWeeklyWins: initialDailyState.allTimeWeeklyWins,
   weekKey: initialDailyState.weekKey,
   weeklyPoints: initialDailyState.weeklyPoints,
+  weeklyDuelBonusSynced: initialDailyState.weeklyDuelBonusSynced,
   pins: loadPins(),
   loginBonusDates: loadLoginBonusDates(),
   cosmetics: loadAllCosmetics(),
@@ -448,7 +460,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
   activeDuelId: null,
   coinHistory: [],
   coinHistoryLoading: false,
-  weeklyDuelBonus: {},
 
   setPauseMenuOpen: (open) => set({ pauseMenuOpen: open }),
 
@@ -1148,6 +1159,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     resetAllTimeBoard()
     resetAllTimeWeeklyWins()
     resetWeeklyRecords()
+    resetWeeklyDuelBonusSynced()
     saveLoginBonusDates({})
     set({
       statistics: {} as Record<CharacterId, PlayerStatistics>,
@@ -1156,6 +1168,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       allTimeWeeklyWins: {},
       weekKey: currentWeekKey(),
       weeklyPoints: {},
+      weeklyDuelBonusSynced: {},
       loginBonusDates: {},
     })
   },
@@ -1255,9 +1268,33 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({ coinHistory, coinHistoryLoading: false })
   },
 
-  loadWeeklyDuelBonus: async () => {
-    const bonus = await fetchWeeklyDuelPoints(currentWeekKey())
-    set({ weeklyDuelBonus: bonus })
+  /** Rechnet neu gewonnenen Duell-Wochenbonus in die ganz normale lokale weeklyPoints-Summe ein
+   * (Teil: Wochenbewertung) - läuft bei jedem App-Start und beim Öffnen der Wochen-Bestenliste.
+   * fetchWeeklyDuelPoints liefert immer den GESAMTSTAND der Woche (nicht nur neue Ereignisse),
+   * deshalb wird hier nur die Differenz zum zuletzt eingerechneten Stand (weeklyDuelBonusSynced)
+   * addiert - sonst würde derselbe Bonus bei jedem Aufruf erneut gutgeschrieben. Ab jetzt zählt der
+   * Bonus wie jeder andere Wochenpunkt ganz normal bei Wochensieger-Ermittlung und
+   * Allzeit-Übernahme mit (siehe processDailyAndWeeklyRollover). */
+  syncWeeklyDuelBonus: async () => {
+    const { weekKey, weeklyPoints, weeklyDuelBonusSynced } = get()
+    const totals = await fetchWeeklyDuelPoints(weekKey)
+    let nextPoints = weeklyPoints
+    let nextSynced = weeklyDuelBonusSynced
+    let changed = false
+    for (const [id, total] of Object.entries(totals) as [CharacterId, number][]) {
+      const already = weeklyDuelBonusSynced[id] ?? 0
+      const delta = (total ?? 0) - already
+      if (delta > 0) {
+        nextPoints = { ...nextPoints, [id]: (nextPoints[id] ?? 0) + delta }
+        nextSynced = { ...nextSynced, [id]: total }
+        changed = true
+      }
+    }
+    if (changed) {
+      saveWeeklyRecords(weekKey, nextPoints)
+      saveWeeklyDuelBonusSynced(nextSynced)
+      set({ weeklyPoints: nextPoints, weeklyDuelBonusSynced: nextSynced })
+    }
   },
 }))
 

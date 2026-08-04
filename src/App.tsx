@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { useGameStore } from './state/gameStore'
 import { StartScreen } from './ui/screens/StartScreen'
 import { PlayerSelectScreen } from './ui/screens/PlayerSelectScreen'
@@ -67,6 +67,15 @@ function ScreenRouter() {
 }
 
 export default function App() {
+  const syncWeeklyDuelBonus = useGameStore((s) => s.syncWeeklyDuelBonus)
+
+  // Duell-Wochenbonus bei jedem App-Start nachziehen (Teil: Wochenbewertung) - deckt "man kommt
+  // später wieder rein" ab, ohne dass man extra die Wochen-Bestenliste öffnen müsste (die tut es
+  // beim eigenen Mount ohnehin nochmal, siehe ui/screens/WeeklyScreen.tsx).
+  useEffect(() => {
+    void syncWeeklyDuelBonus()
+  }, [syncWeeklyDuelBonus])
+
   return (
     <>
       <ScreenRouter />

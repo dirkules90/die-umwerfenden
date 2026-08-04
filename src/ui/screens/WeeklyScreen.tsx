@@ -26,14 +26,13 @@ export function WeeklyScreen() {
   const weeklyPoints = useGameStore((s) => s.weeklyPoints)
   const dailyRecords = useGameStore((s) => s.dailyRecords)
   const statistics = useGameStore((s) => s.statistics)
-  const weeklyDuelBonus = useGameStore((s) => s.weeklyDuelBonus)
-  const loadWeeklyDuelBonus = useGameStore((s) => s.loadWeeklyDuelBonus)
+  const syncWeeklyDuelBonus = useGameStore((s) => s.syncWeeklyDuelBonus)
   const goTo = useGameStore((s) => s.goTo)
   const [selected, setSelected] = useState<CharacterId>('daniel')
 
   useEffect(() => {
-    void loadWeeklyDuelBonus()
-  }, [loadWeeklyDuelBonus])
+    void syncWeeklyDuelBonus()
+  }, [syncWeeklyDuelBonus])
 
   const monday = mondayOfWeek(new Date())
   const sunday = new Date(monday)
@@ -47,11 +46,6 @@ export function WeeklyScreen() {
   const todayPoints = computeTotalDailyPoints(dailyRecords, statistics, todayKey())
   const combined: Partial<Record<CharacterId, number>> = { ...weeklyPoints }
   for (const [id, points] of Object.entries(todayPoints) as [CharacterId, number][]) {
-    combined[id] = (combined[id] ?? 0) + (points ?? 0)
-  }
-  // Duell-Bonuspunkte kommen live aus dem Backend dazu (Teil: Online-Duelle) - anders als der Rest
-  // der Wochenpunkte sind Duelle geräteübergreifend, siehe backend/wallet.ts.
-  for (const [id, points] of Object.entries(weeklyDuelBonus) as [CharacterId, number][]) {
     combined[id] = (combined[id] ?? 0) + (points ?? 0)
   }
 

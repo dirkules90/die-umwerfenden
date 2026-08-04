@@ -11,6 +11,7 @@ const ALLTIME_WEEKLY_WINS_KEY = 'kegeln-lembeck:alltime-weekly-wins:v1'
 const PIN_KEY = 'kegeln-lembeck:pins:v1'
 const COSMETICS_KEY = 'kegeln-lembeck:cosmetics:v1'
 const WEEKLY_KEY = 'kegeln-lembeck:weekly:v1'
+const WEEKLY_DUEL_BONUS_SYNCED_KEY = 'kegeln-lembeck:weekly-duel-bonus-synced:v1'
 const LOGIN_BONUS_KEY = 'kegeln-lembeck:login-bonus:v1'
 
 /** Start-PIN jedes Charakters, bis er/sie sie einmal persönlich ändert (Teil: Charakter-PIN,
@@ -200,6 +201,28 @@ export function saveWeeklyRecords(weekKey: string, points: Partial<Record<Charac
 
 export function resetWeeklyRecords(): void {
   localStorage.removeItem(WEEKLY_KEY)
+}
+
+/** Wie viel Duell-Wochenbonus (siehe backend/wallet.ts fetchWeeklyDuelPoints) je Charakter bereits
+ * in die lokale weeklyPoints-Summe eingerechnet wurde (Teil: Online-Duelle) - verhindert doppeltes
+ * Gutschreiben, wenn syncWeeklyDuelBonus mehrfach pro Woche läuft (z. B. bei jedem App-Start), weil
+ * das Backend immer den Gesamtstand der Woche liefert statt einzelner neuer Ereignisse. */
+export function loadWeeklyDuelBonusSynced(): Partial<Record<CharacterId, number>> {
+  try {
+    const raw = localStorage.getItem(WEEKLY_DUEL_BONUS_SYNCED_KEY)
+    if (!raw) return {}
+    return JSON.parse(raw)
+  } catch {
+    return {}
+  }
+}
+
+export function saveWeeklyDuelBonusSynced(synced: Partial<Record<CharacterId, number>>): void {
+  localStorage.setItem(WEEKLY_DUEL_BONUS_SYNCED_KEY, JSON.stringify(synced))
+}
+
+export function resetWeeklyDuelBonusSynced(): void {
+  localStorage.removeItem(WEEKLY_DUEL_BONUS_SYNCED_KEY)
 }
 
 /** Letztes Datum (JJJJ-MM-TT), an dem ein Charakter den Tages-Login-Bonus bereits bekommen hat
