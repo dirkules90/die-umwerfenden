@@ -211,6 +211,19 @@ function rankParticipants(duel: DuelRow, participants: DuelParticipantRow[]): Du
   return [...played].sort((a, b) => (better(a.score!, b.score!) ? -1 : better(b.score!, a.score!) ? 1 : 0))
 }
 
+/** Wählt die Gewinner anhand von RANG-GRUPPEN statt einer festen Positions-Abschneidung (Teil:
+ * Pott-Aufteilung) - bei einem Gleichstand um den letzten bezahlten Platz (z. B. zwei Leute teilen
+ * sich Platz 1 bei "Gewinner bekommt alles") zählen BEIDE als Gewinner und teilen sich den Pott,
+ * statt dass per Sortier-Zufall nur einer von beiden ausgezahlt wird. */
+function selectWinners(ranked: DuelParticipantRow[], placeCount: number): DuelParticipantRow[] {
+  const distinctScores: number[] = []
+  for (const p of ranked) {
+    if (!distinctScores.includes(p.score!)) distinctScores.push(p.score!)
+  }
+  const paidScores = new Set(distinctScores.slice(0, placeCount))
+  return ranked.filter((p) => paidScores.has(p.score!))
+}
+
 /** Versucht ein Duell abzuschließen, sobald alle Teilnehmer ihr Ergebnis eingereicht haben -
  * optimistischer Lock über den status-Wechsel 'accepted' -> 'completed' (nur das Gerät, dessen
  * Update tatsächlich eine Zeile trifft, wertet aus) verhindert doppelte Pott-Auszahlung, falls zwei
@@ -234,7 +247,7 @@ async function tryResolveDuel(duelId: string): Promise<void> {
     const ranked = rankParticipants(duel, accepted)
     const pot = duel.stake * accepted.length
     const placeCount = Math.min(SPLIT_COUNT[duel.split_mode], ranked.length)
-    const winners = ranked.slice(0, placeCount)
+    const winners = selectWinners(ranked, placeCount)
     const share = Math.floor(pot / winners.length)
     let remainder = pot - share * winners.length
 

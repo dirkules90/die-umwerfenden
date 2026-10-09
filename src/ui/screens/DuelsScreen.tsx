@@ -82,13 +82,16 @@ export function DuelsScreen() {
   // Beteiligten anpassen".
   const maxStake = opponents.reduce((max, id) => Math.min(max, walletBalances?.[id] ?? 0), coins)
 
-  // Beim Öffnen des Formulars startet der Regler auf dem vollen aktuellen Maximum (Teil:
-  // Duell-Formular) - danach nur noch nach unten gekappt, wenn das Maximum durch eine
-  // Gegner-Auswahl sinkt (siehe nächster Effekt), nie automatisch wieder hochgesetzt.
+  // Beim Öffnen des Formulars (oder sobald die echten Kontostände nachträglich eintreffen) startet
+  // der Regler auf dem vollen aktuellen Maximum (Teil: Duell-Formular) - der zweite Fall ist
+  // wichtig, falls das Formular schon offen war, BEVOR loadWalletBalances fertig war: sonst bliebe
+  // stake für immer bei seinem Platzhalter-Wert von 0 hängen, weil der separate Clamp-Effekt unten
+  // nur nach UNTEN kappt, nie von selbst wieder hochsetzt. Danach nur noch nach unten gekappt, wenn
+  // das Maximum durch eine Gegner-Auswahl sinkt, nie automatisch wieder hochgesetzt.
   useEffect(() => {
-    if (showCreate) setStake(maxStake)
+    if (showCreate && walletsReady) setStake(maxStake)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showCreate])
+  }, [showCreate, walletsReady])
 
   useEffect(() => {
     setStake((s) => Math.min(s, maxStake))
@@ -226,6 +229,11 @@ export function DuelsScreen() {
           {maxStake <= 0 && (
             <p style={{ fontSize: '0.75rem', color: '#ff8a80', margin: 0 }}>
               Kein Einsatz möglich - {opponents.length > 0 ? 'ein ausgewählter Gegner hat' : 'du hast'} 0 Münzen.
+            </p>
+          )}
+          {opponents.length === 0 && maxStake > 0 && (
+            <p style={{ fontSize: '0.75rem', color: '#ffd75e', margin: 0 }}>
+              Bitte mindestens einen Gegner oben antippen, um ihn auszuwählen.
             </p>
           )}
 
