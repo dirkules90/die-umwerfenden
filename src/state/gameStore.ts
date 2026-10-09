@@ -1291,6 +1291,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   backToStartFromGameOver: () => {
+    // War dieser Durchgang Teil eines Duells (Teil: Online-Duelle), geht's zurück zur Duelle-Seite
+    // statt zum Start - dort sieht man direkt den neuen Stand ("Gespielt, warte auf Gegner…" oder
+    // die fertige Auszahlung), statt erst wieder manuell dorthin navigieren zu müssen.
+    const wasDuelGame = get().activeDuelId !== null
     set({
       session: null,
       tannenbaumSession: null,
@@ -1299,13 +1303,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
       // brechen ohne selectedPlayer sofort ab), weil ModeSelectScreen jetzt direkt erreicht wird,
       // ohne vorher erneut den Charakter auszuwählen.
       selectedPlayer: get().currentPlayer,
-      screen: 'start',
+      screen: wasDuelGame ? 'duels' : 'start',
       finalResult: null,
       tannenbaumResult: null,
       lastGameCoins: null,
       pauseMenuOpen: false,
       activeDuelId: null,
     })
+    if (wasDuelGame) void get().loadDuels()
   },
 
   loadDuels: async () => {
