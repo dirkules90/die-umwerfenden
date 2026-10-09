@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { cosmeticsFor, useGameStore } from '../../state/gameStore'
+import { useGameStore } from '../../state/gameStore'
 import { AVATAR_CONFIGS, CHARACTER_ORDER } from '../../characters/avatarConfigs'
 import { AmbientBackground } from '../components/AmbientBackground'
 import { formatPoints } from '../formatPoints'
@@ -31,10 +31,12 @@ export function DuelsScreen() {
   const duels = useGameStore((s) => s.duels)
   const duelsLoading = useGameStore((s) => s.duelsLoading)
   const duelError = useGameStore((s) => s.duelError)
-  const cosmetics = useGameStore((s) => s.cosmetics)
+  const walletBalances = useGameStore((s) => s.walletBalances)
+  const walletBalancesLoading = useGameStore((s) => s.walletBalancesLoading)
   const goTo = useGameStore((s) => s.goTo)
   const requireLogin = useGameStore((s) => s.requireLogin)
   const loadDuels = useGameStore((s) => s.loadDuels)
+  const loadWalletBalances = useGameStore((s) => s.loadWalletBalances)
   const createDuelRequest = useGameStore((s) => s.createDuelRequest)
   const respondToDuelRequest = useGameStore((s) => s.respondToDuelRequest)
   const cancelDuelRequest = useGameStore((s) => s.cancelDuelRequest)
@@ -49,9 +51,13 @@ export function DuelsScreen() {
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    if (duelsPlayer) void loadDuels()
-    else requireLogin('duels')
-  }, [duelsPlayer, loadDuels, requireLogin])
+    if (duelsPlayer) {
+      void loadDuels()
+      void loadWalletBalances()
+    } else {
+      requireLogin('duels')
+    }
+  }, [duelsPlayer, loadDuels, loadWalletBalances, requireLogin])
 
   const sorted = useMemo(() => {
     function rank(d: Duel): number {
@@ -65,15 +71,16 @@ export function DuelsScreen() {
     return [...duels].sort((a, b) => rank(a) - rank(b))
   }, [duels, duelsPlayer])
 
-  const coins = duelsPlayer ? cosmeticsFor(cosmetics, duelsPlayer).coins : 0
+  // Echte (Backend-)Kontostände statt lokaler cosmetics.coins (Teil: Online-Duelle) - ein Gegner
+  // kennt diesen Browser/dieses Gerät vielleicht gar nicht, lokale Daten für ihn wären also
+  // schlicht falsch. walletBalances === null heißt "noch nicht geladen", nicht "0 Münzen".
+  const walletsReady = walletBalances !== null
+  const coins = duelsPlayer && walletBalances ? (walletBalances[duelsPlayer] ?? 0) : 0
   // Höchster Einsatz, den JEDER Teilnehmer sich leisten kann (Teil: Duell-Formular) - ohne
   // ausgewählte Gegner nur durch den eigenen Kontostand begrenzt, mit Gegnern zusätzlich durch
-  // deren (auf diesem Gerät bekannten) Kontostand, siehe Nutzer-Feedback "Schieberegler soll sich
-  // auf das Minimum aller Beteiligten anpassen".
-  const maxStake = opponents.reduce(
-    (max, id) => Math.min(max, cosmeticsFor(cosmetics, id).coins),
-    coins,
-  )
+  // deren echten Kontostand, siehe Nutzer-Feedback "Schieberegler soll sich auf das Minimum aller
+  // Beteiligten anpassen".
+  const maxStake = opponents.reduce((max, id) => Math.min(max, walletBalances?.[id] ?? 0), coins)
 
   // Beim Öffnen des Formulars startet der Regler auf dem vollen aktuellen Maximum (Teil:
   // Duell-Formular) - danach nur noch nach unten gekappt, wenn das Maximum durch eine
@@ -118,7 +125,7 @@ export function DuelsScreen() {
       <button className="btn secondary screen-nav" onClick={() => goTo('start')}>
         ← Zurück
       </button>
-      <div className="shop-coins panel">🪙 {coins}</div>
+      <div className="shop-coins panel">🪙 {walletsReady ? coins : '…'}</div>
       <div className="shop-title-row">
         <img className="hud-avatar" src={AVATAR_CONFIGS[duelsPlayer].photoUrl} alt={AVATAR_CONFIGS[duelsPlayer].name} />
         <h2 style={{ margin: 0 }}>Duelle von {AVATAR_CONFIGS[duelsPlayer].name}</h2>
@@ -151,30 +158,47 @@ export function DuelsScreen() {
       {showCreate && (
         <div className="panel duel-create-panel">
           <h3 style={{ marginTop: 0 }}>Neues Duell</h3>
-          <p style={{ fontSize: '0.8rem', opacity: 0.75, margin: '0 0 0.6rem' }}>Gegner auswählen (mehrere möglich):</p>
-          <div className="duel-opponent-row">
-            {otherCharacters.map((id) => {
-              const opponentCoins = cosmeticsFor(cosmetics, id).coins
-              const disabled = opponentCoins <= 0
-              return (
-                <button
-                  key={id}
-                  className={`char-tile ${opponents.includes(id) ? 'selected' : ''} ${disabled ? 'disabled' : ''}`}
-                  disabled={disabled}
-                  title={disabled ? `${AVATAR_CONFIGS[id].name} hat keine Münzen` : undefined}
-                  onClick={() =>
-                    setOpponents((prev) => (prev.includes(id) ? prev.filter((o) => o !== id) : [...prev, id]))
-                  }
-                >
-                  <img src={AVATAR_CONFIGS[id].photoUrl} alt={AVATAR_CONFIGS[id].name} />
-                  <span className="name">{AVATAR_CONFIGS[id].name}</span>
-                  {disabled && <span className="duel-opponent-zero">0 🪙</span>}
-                </button>
-              )
-            })}
-          </div>
 
-          <div className="duel-form-row">
+          {!walletsReady ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+              <p className="subtitle" style={{ margin: 0 }}>
+                {walletBalancesLoading ? 'Lade Kontostände…' : 'Kontostände konnten nicht geladen werden.'}
+              </p>
+              <button className="btn secondary" onClick={() => void loadWalletBalances()}>
+                Erneut versuchen
+              </button>
+              <button className="btn secondary" onClick={() => setShowCreate(false)}>
+                Abbrechen
+              </button>
+            </div>
+          ) : (
+            <>
+              <p style={{ fontSize: '0.8rem', opacity: 0.75, margin: '0 0 0.6rem' }}>
+                Gegner auswählen (mehrere möglich):
+              </p>
+              <div className="duel-opponent-row">
+                {otherCharacters.map((id) => {
+                  const opponentCoins = walletBalances[id] ?? 0
+                  const disabled = opponentCoins <= 0
+                  return (
+                    <button
+                      key={id}
+                      className={`char-tile ${opponents.includes(id) ? 'selected' : ''} ${disabled ? 'disabled' : ''}`}
+                      disabled={disabled}
+                      title={disabled ? `${AVATAR_CONFIGS[id].name} hat keine Münzen` : undefined}
+                      onClick={() =>
+                        setOpponents((prev) => (prev.includes(id) ? prev.filter((o) => o !== id) : [...prev, id]))
+                      }
+                    >
+                      <img src={AVATAR_CONFIGS[id].photoUrl} alt={AVATAR_CONFIGS[id].name} />
+                      <span className="name">{AVATAR_CONFIGS[id].name}</span>
+                      {disabled && <span className="duel-opponent-zero">0 🪙</span>}
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="duel-form-row">
             <label>Spielmodus</label>
             <select value={mode} onChange={(e) => setMode(e.target.value as DuelMode)}>
               {(Object.keys(MODE_LABELS) as DuelMode[]).map((m) => (
@@ -233,6 +257,8 @@ export function DuelsScreen() {
               Abbrechen
             </button>
           </div>
+            </>
+          )}
         </div>
       )}
 

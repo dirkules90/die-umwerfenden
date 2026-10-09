@@ -118,6 +118,7 @@ import {
   syncCoinTransactionBestEffort,
   fetchCoinHistory,
   fetchWeeklyDuelPoints,
+  fetchAllWalletBalances,
   type CoinTransactionRow,
 } from '../backend/wallet'
 import {
@@ -222,6 +223,13 @@ interface GameStore {
   activeDuelId: string | null
   coinHistory: CoinTransactionRow[]
   coinHistoryLoading: boolean
+  /** Echte (Backend-)Kontostände aller Charaktere, nicht nur des eigenen (Teil: Online-Duelle) -
+   * lokale cosmetics.coins sind geräteweise getrennt und sagen nichts darüber aus, wie viele
+   * Münzen ein GEGNER tatsächlich hat, wenn der sich noch nie auf diesem Gerät eingeloggt hat
+   * (Duelle sind ja gerade für genau diesen geräteübergreifenden Fall gedacht). null = noch nicht
+   * geladen, siehe loadWalletBalances. */
+  walletBalances: Partial<Record<CharacterId, number>> | null
+  walletBalancesLoading: boolean
   /** Wie viel Duell-Wochenbonus je Charakter bereits in weeklyPoints eingerechnet wurde (Teil:
    * Wochenbewertung) - der Bonus selbst lebt im Backend (siehe backend/wallet.ts), weil Duelle
    * geräteübergreifend sind, wird aber per syncWeeklyDuelBonus in die ganz normale lokale
@@ -250,7 +258,6 @@ interface GameStore {
   selectPlayer: (id: CharacterId) => void
   verifyPin: (id: CharacterId, pin: string) => boolean
   changePin: (id: CharacterId, oldPin: string, newPin: string) => boolean
-  selectShopPlayer: (id: CharacterId) => void
   setHairColor: (id: CharacterId, color: string) => void
   equipOrBuyHairStyle: (id: CharacterId, style: HairStyleId) => boolean
   equipOrBuyShirtStyle: (id: CharacterId, style: ShirtStyleId) => boolean
@@ -284,7 +291,6 @@ interface GameStore {
   updateSettings: (partial: Partial<Settings>) => void
   backToStartFromGameOver: () => void
 
-  selectDuelsPlayer: (id: CharacterId) => void
   loadDuels: () => Promise<void>
   createDuelRequest: (input: Omit<CreateDuelInput, 'challengerId'>) => Promise<boolean>
   respondToDuelRequest: (duelId: string, accept: boolean) => Promise<boolean>
@@ -292,6 +298,7 @@ interface GameStore {
   dismissDuelNotification: (duelId: string) => Promise<void>
   startDuelGame: (duel: Duel) => void
   loadCoinHistory: (id: CharacterId) => Promise<void>
+  loadWalletBalances: () => Promise<void>
   syncWeeklyDuelBonus: () => Promise<void>
 }
 
@@ -511,6 +518,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   activeDuelId: null,
   coinHistory: [],
   coinHistoryLoading: false,
+  walletBalances: null,
+  walletBalancesLoading: false,
 
   setPauseMenuOpen: (open) => set({ pauseMenuOpen: open }),
 
@@ -612,11 +621,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
     savePins(pins)
     set({ pins })
     return true
-  },
-
-  selectShopPlayer: (id) => {
-    soundManager.playButtonClick()
-    set({ shopPlayer: id })
   },
 
   setHairColor: (id, color) => {
@@ -1304,11 +1308,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
     })
   },
 
-  selectDuelsPlayer: (id) => {
-    soundManager.playButtonClick()
-    set({ duelsPlayer: id })
-  },
-
   loadDuels: async () => {
     const { duelsPlayer } = get()
     if (!duelsPlayer) return
@@ -1327,6 +1326,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       return false
     }
     await get().loadDuels()
+    void get().loadWalletBalances()
     return true
   },
 
@@ -1341,6 +1341,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
     soundManager.playButtonClick()
     await get().loadDuels()
+    void get().loadWalletBalances()
     return true
   },
 
@@ -1375,6 +1376,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({ coinHistoryLoading: true })
     const coinHistory = await fetchCoinHistory(id)
     set({ coinHistory, coinHistoryLoading: false })
+  },
+
+  /** Lädt die echten Kontostände ALLER Charaktere aus dem Backend (Teil: Online-Duelle) - nötig,
+   * um beim Duell-Anlegen zu wissen, ob ein Gegner sich einen Einsatz überhaupt leisten kann, denn
+   * lokale cosmetics.coins kennen nur, was auf DIESEM Gerät je gespielt wurde. */
+  loadWalletBalances: async () => {
+    set({ walletBalancesLoading: true })
+    const walletBalances = await fetchAllWalletBalances()
+    set({ walletBalances, walletBalancesLoading: false })
   },
 
   /** Rechnet neu gewonnenen Duell-Wochenbonus in die ganz normale lokale weeklyPoints-Summe ein
