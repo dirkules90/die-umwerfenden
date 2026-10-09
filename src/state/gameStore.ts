@@ -1290,7 +1290,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({
       session: null,
       tannenbaumSession: null,
-      selectedPlayer: null,
+      // Nicht mehr auf null zurücksetzen (Teil: Zentrales Login) - currentPlayer bleibt ja
+      // eingeloggt, "Neues Spiel" würde sonst stillschweigend nichts tun (startGame/startTannenbaum
+      // brechen ohne selectedPlayer sofort ab), weil ModeSelectScreen jetzt direkt erreicht wird,
+      // ohne vorher erneut den Charakter auszuwählen.
+      selectedPlayer: get().currentPlayer,
       screen: 'start',
       finalResult: null,
       tannenbaumResult: null,
