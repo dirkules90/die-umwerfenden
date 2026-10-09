@@ -8,17 +8,22 @@ const CURVE_STRENGTH = 1.1
 // Wisch-Input und Gesamtbudget pro Wurf. Budget vorher bei 2.4: kombiniert mit der langen
 // Restlaufzeit direkt nach dem Loslassen ließ sich damit quer über die gesamte (nur 1.1m breite)
 // Bahn korrigieren - ein nach rechts gezielter Wurf konnte trotzdem den äußeren linken Kegel
-// treffen (Nutzer-Feedback: "etwas zu leicht"). Zwei Stellschrauben zusammen begrenzen das jetzt:
-// (1) niedrigeres Gesamtbudget (1.3 statt 2.4), (2) ein Anlauf-Faktor (STEER_RAMP_*), der die
-// Lenkwirkung direkt nach dem Loslassen auf STEER_RAMP_FLOOR (25%) drosselt und erst über
-// STEER_RAMP_DURATION Sekunden auf volle Stärke hochfährt - genau der "sofort nach dem Loslassen
-// hart gegensteuern"-Trick (maximale Restlaufzeit = maximale Wirkung) wird damit gezielt
-// entschärft, während spätere Feinkorrekturen ihre volle (wenn auch insgesamt reduzierte)
-// Wirkung behalten.
-const STEER_RATE = 3.2
-const STEER_MAX_BUDGET = 1.3
+// treffen (Nutzer-Feedback: "etwas zu leicht"). Mehrere Stellschrauben zusammen begrenzen das
+// jetzt: (1) niedrigeres Gesamtbudget (1.0 statt 1.3) und niedrigere Rate (2.4 statt 3.2) für
+// insgesamt schwächere Korrekturen (Nutzer-Feedback: "Einfluss sollte geringer sein"), (2) ein
+// Anlauf-Faktor (STEER_RAMP_*), der die Lenkwirkung direkt nach dem Loslassen auf
+// STEER_RAMP_FLOOR (25%) drosselt und erst über STEER_RAMP_DURATION Sekunden auf volle Stärke
+// hochfährt - genau der "sofort nach dem Loslassen hart gegensteuern"-Trick (maximale
+// Restlaufzeit = maximale Wirkung) wird damit gezielt entschärft, während spätere
+// Feinkorrekturen ihre volle (wenn auch insgesamt reduzierte) Wirkung behalten, (3) eine feste
+// Obergrenze von STEER_MAX_SWIPES einzelnen Wisch-Gesten pro Wurf (Nutzer-Feedback: "nur 3 mal
+// korrigieren können") - unabhängig vom verbleibenden Budget zählt jede neue Berührung während
+// des Rollens als eine Korrektur, die vierte und jede weitere bleibt wirkungslos.
+const STEER_RATE = 2.4
+const STEER_MAX_BUDGET = 1.0
 const STEER_RAMP_DURATION = 0.4
 const STEER_RAMP_FLOOR = 0.25
+const STEER_MAX_SWIPES = 3
 
 export class Ball {
   mesh: THREE.Mesh
@@ -28,6 +33,13 @@ export class Ball {
   private steerInput = 0
   private steerBudget = STEER_MAX_BUDGET
   private rollElapsed = 0
+  /** Anzahl bereits begonnener Wisch-Korrekturen in diesem Wurf (siehe setSteerInput/applySteer),
+   * gedeckelt bei STEER_MAX_SWIPES. */
+  private steerSwipesUsed = 0
+  /** Ob gerade eine Wisch-Geste aktiv ist (steerInput ungleich 0) - dient nur der
+   * Flankenerkennung in setSteerInput, um eine neue Geste von einer fortlaufenden zu
+   * unterscheiden. */
+  private steerGestureActive = false
 
   constructor(rapier: typeof RAPIER, world: RAPIER.World) {
     const geo = new THREE.SphereGeometry(BALL_RADIUS, 24, 18)
@@ -63,6 +75,8 @@ export class Ball {
     this.steerInput = 0
     this.steerBudget = STEER_MAX_BUDGET
     this.rollElapsed = 0
+    this.steerSwipesUsed = 0
+    this.steerGestureActive = false
     this.body.setTranslation({ x: 0, y: BALL_RADIUS + 0.05, z: START_Z }, true)
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true)
@@ -79,13 +93,25 @@ export class Ball {
     this.steerInput = 0
     this.steerBudget = STEER_MAX_BUDGET
     this.rollElapsed = 0
+    this.steerSwipesUsed = 0
+    this.steerGestureActive = false
     this.body.setLinvel({ x: vx, y: 0, z: vz }, true)
     this.body.setAngvel({ x: speed * 3, y: this.spinFactor * 10, z: 0 }, true)
   }
 
-  /** direction: -1 (links) bis 1 (rechts) aus der aktuellen Wisch-/Zuggeste während des Rollens. */
+  /** direction: -1 (links) bis 1 (rechts) aus der aktuellen Wisch-/Zuggeste während des Rollens.
+   * Erkennt den Beginn einer NEUEN Geste (0 -> ungleich 0) und zählt sie gegen STEER_MAX_SWIPES -
+   * eine fortlaufende Geste (mehrere onPointerMove-Events derselben Berührung) zählt dabei nur
+   * einmal, siehe steerGestureActive. */
   setSteerInput(direction: number) {
-    this.steerInput = THREE.MathUtils.clamp(direction, -1, 1)
+    const clamped = THREE.MathUtils.clamp(direction, -1, 1)
+    if (clamped !== 0 && !this.steerGestureActive) {
+      this.steerGestureActive = true
+      this.steerSwipesUsed += 1
+    } else if (clamped === 0) {
+      this.steerGestureActive = false
+    }
+    this.steerInput = clamped
   }
 
   /** Verbraucht das Lenk-Budget proportional zu Wisch-Input, Zeit und dem Anlauf-Faktor (siehe
@@ -97,6 +123,7 @@ export class Ball {
   applySteer(dt: number) {
     this.rollElapsed += dt
     if (this.steerInput === 0 || this.steerBudget <= 0) return
+    if (this.steerSwipesUsed > STEER_MAX_SWIPES) return
     const v = this.body.linvel()
     const speed = Math.hypot(v.x, v.z)
     if (speed < 0.4) return
