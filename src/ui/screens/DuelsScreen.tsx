@@ -23,6 +23,19 @@ function formatScore(mode: DuelMode, score: number | null): string {
   return mode === 'tannenbaum' ? `${score} Würfe` : String(score).padStart(3, '0')
 }
 
+/** Zeigt fremde Ergebnisse erst, wenn das ganze Duell abgeschlossen ist (Teil: Online-Duelle) -
+ * sonst hätte, wer als Letztes dran ist, einen Taktik-Vorteil (z. B. bei "Niedrige Hausnummer"
+ * gezielt knapp unter den schon bekannten Bestwert zielen). Der eigene Score ist davon ausgenommen,
+ * der war ja ohnehin schon bekannt. */
+function participantScoreLabel(duel: Duel, p: Duel['participants'][number], viewerId: CharacterId): string {
+  if (p.response === 'declined') return 'abgelehnt'
+  if (p.response === 'pending') return 'wartet…'
+  if (p.score === null) return '–'
+  const isOwnRow = p.character_id === viewerId
+  if (!isOwnRow && duel.status !== 'completed') return '🔒 verdeckt'
+  return formatScore(duel.mode, p.score)
+}
+
 /** Zentraler Duelle-Bildschirm (Teil: Online-Duelle) - eine flache Liste statt getrennter Tabs für
  * "offen/aktiv/fertig", weil bei einer 6er-Gruppe ohnehin nur wenige Duelle gleichzeitig laufen und
  * eine Liste mit klarer pro-Zeile-Handlung übersichtlicher ist als mehrere fast leere Tabs. */
@@ -292,13 +305,7 @@ export function DuelsScreen() {
                   <div key={p.character_id} className="duel-participant-row">
                     <img src={AVATAR_CONFIGS[p.character_id].photoUrl} alt="" />
                     <span>{AVATAR_CONFIGS[p.character_id].name}</span>
-                    <span style={{ opacity: 0.7 }}>
-                      {p.response === 'declined'
-                        ? 'abgelehnt'
-                        : p.response === 'pending'
-                          ? 'wartet…'
-                          : formatScore(d.mode, p.score)}
-                    </span>
+                    <span style={{ opacity: 0.7 }}>{participantScoreLabel(d, p, duelsPlayer)}</span>
                     {p.payout !== null && (
                       <strong style={{ color: p.payout >= 0 ? '#7cffb0' : '#ff8a80' }}>
                         {p.payout >= 0 ? '+' : ''}
