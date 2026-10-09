@@ -17,13 +17,25 @@ jobs:
         run: |
           # Derselbe anon-Key wie in src/backend/supabaseClient.ts - der ist bewusst öffentlich
           # (siehe Kommentar dort), die eigentliche Absicherung läuft über Row-Level-Security.
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+          #
+          # curl darf hier NICHT den ganzen Job scheitern lassen (set -e ist in GitHub-Actions-
+          # run-Steps Standard): ein einzelner Netzwerk-Hänger oder ein gerade noch pausiertes
+          # Supabase-Projekt soll nur eine Warnung loggen, nicht bei jedem Lauf ein rotes Kreuz
+          # erzeugen - sonst würde dieser Job genau das Rauschen erzeugen, das er verhindern soll.
+          set +e
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 \
             "https://ocodaikjnomrdvgqoaov.supabase.co/rest/v1/wallets?select=character_id&limit=1" \
             -H "apikey: ${SUPABASE_ANON_KEY}" \
             -H "Authorization: Bearer ${SUPABASE_ANON_KEY}")
+          CURL_EXIT=$?
+          set -e
+          if [ "$CURL_EXIT" -ne 0 ]; then
+            echo "::warning::Supabase nicht erreichbar (curl-Exitcode $CURL_EXIT) - evtl. noch pausiert oder Netzwerkproblem."
+            exit 0
+          fi
           echo "Supabase REST API antwortete mit Status $STATUS"
-          if [ "$STATUS" -ge 500 ]; then
-            echo "::warning::Supabase antwortete mit Serverfehler $STATUS - Projekt eventuell noch pausiert oder down."
+          if [ "$STATUS" -ge 500 ] || [ "$STATUS" = "000" ]; then
+            echo "::warning::Supabase antwortete mit Status $STATUS - Projekt eventuell noch pausiert oder down."
           fi
         env:
           SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9jb2RhaWtqbm9tcmR2Z3FvYW92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4MjY0MzUsImV4cCI6MjEwMTQwMjQzNX0.L_bhazkG4i2rCypQjoJTwdBDdW3IWjrCflSCZzSkacQ
