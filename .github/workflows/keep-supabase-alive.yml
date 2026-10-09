@@ -1,0 +1,29 @@
+name: Keep Supabase project alive
+
+# Supabase pausiert kostenlose Projekte nach 7 Tagen ohne API-Aktivität (Teil: Online-Duelle) -
+# diese winzige, harmlose Leseabfrage zählt als Aktivität und verhindert das automatische
+# Pausieren, ohne dass jemand manuell daran denken muss. Läuft zweimal pro Woche (Montag +
+# Donnerstag), damit selbst ein ausgefallener Lauf die 7-Tage-Grenze nicht reißt.
+on:
+  schedule:
+    - cron: '0 6 * * 1,4'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API
+        run: |
+          # Derselbe anon-Key wie in src/backend/supabaseClient.ts - der ist bewusst öffentlich
+          # (siehe Kommentar dort), die eigentliche Absicherung läuft über Row-Level-Security.
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://ocodaikjnomrdvgqoaov.supabase.co/rest/v1/wallets?select=character_id&limit=1" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}")
+          echo "Supabase REST API antwortete mit Status $STATUS"
+          if [ "$STATUS" -ge 500 ]; then
+            echo "::warning::Supabase antwortete mit Serverfehler $STATUS - Projekt eventuell noch pausiert oder down."
+          fi
+        env:
+          SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9jb2RhaWtqbm9tcmR2Z3FvYW92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4MjY0MzUsImV4cCI6MjEwMTQwMjQzNX0.L_bhazkG4i2rCypQjoJTwdBDdW3IWjrCflSCZzSkacQ
