@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useGameStore } from '../../state/gameStore'
 import { FullscreenButton } from '../components/FullscreenButton'
 import { AmbientBackground } from '../components/AmbientBackground'
@@ -18,7 +19,20 @@ export function StartScreen() {
   const currentPlayer = useGameStore((s) => s.currentPlayer)
   const requireLogin = useGameStore((s) => s.requireLogin)
   const logout = useGameStore((s) => s.logout)
+  const duels = useGameStore((s) => s.duels)
+  const loadDuels = useGameStore((s) => s.loadDuels)
   const { isFullscreen, supported, isStandalone, isIOS } = useFullscreen()
+
+  // Badge auf dem Duelle-Button (Teil: Online-Duelle) - zeigt, ohne die Seite extra öffnen zu
+  // müssen, ob es fertig entschiedene Duelle gibt, die man noch nicht gesehen hat.
+  useEffect(() => {
+    if (currentPlayer) void loadDuels()
+  }, [currentPlayer, loadDuels])
+  const unseenDuelResults = currentPlayer
+    ? duels.filter(
+        (d) => d.status === 'completed' && d.participants.some((p) => p.character_id === currentPlayer && !p.seen),
+      ).length
+    : 0
 
   const weekKey = currentWeekKey()
   const challenge = weeklyChallengeDef(weekKey)
@@ -66,8 +80,9 @@ export function StartScreen() {
         <button className="btn secondary" onClick={() => requireLogin('shop')}>
           Shop
         </button>
-        <button className="btn secondary" onClick={() => requireLogin('duels')}>
+        <button className="btn secondary duel-badge-btn" onClick={() => requireLogin('duels')}>
           ⚔️ Duelle
+          {unseenDuelResults > 0 && <span className="duel-badge-count">{unseenDuelResults}</span>}
         </button>
         <button className="btn secondary" onClick={() => openSettings('start')}>
           Einstellungen

@@ -1209,3 +1209,27 @@ h3 {
   padding: 0.3rem 0.7rem;
   font-size: 0.75rem;
 }
+
+/* Ungelesene-Duell-Ergebnisse-Badge auf dem Start-Bildschirm (Teil: Online-Duelle). */
+.duel-badge-btn {
+  position: relative;
+}
+
+.duel-badge-count {
+  position: absolute;
+  top: -0.5rem;
+  right: -0.5rem;
+  background: var(--warnrot);
+  color: var(--text-light);
+  border-radius: 999px;
+  min-width: 1.3rem;
+  height: 1.3rem;
+  padding: 0 0.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 0 0 2px var(--panel-bg);
+}
