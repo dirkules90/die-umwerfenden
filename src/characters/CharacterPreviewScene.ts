@@ -4,10 +4,37 @@ import type { AvatarConfig, CosmeticLoadout } from '../game/types'
 
 const INITIAL_ROTATION_Y = Math.PI * 0.12
 const DRAG_SENSITIVITY = 0.012
+// Ab dieser Gesamt-Zeigerbewegung (Pixel) gilt eine Geste als Ziehen/Drehen statt als Antippen -
+// Fingertipps zittern leicht, ein zu niedriger Schwellwert würde jedes Antippen fälschlich als
+// (winziges) Drehen werten und nie eine Geste auslösen.
+const TAP_MAX_MOVEMENT = 10
+const TAP_MAX_DURATION_MS = 400
 
-/** Leichtgewichtige Vorschau für den Kosmetik-Shop: nur Charaktermodell + Licht, ganz ohne Bahn,
- * Physik oder Kegel - im Gegensatz zu LaneScene, die dafür deutlich zu schwer wäre. Per Touch/Maus
- * horizontal drehbar, damit man die Ausrüstung von allen Seiten begutachten kann. */
+export interface CharacterPreviewCamera {
+  fov: number
+  position: THREE.Vector3
+  lookAt: THREE.Vector3
+}
+
+/** Enge Nahaufnahme auf Oberkörper/Kosmetik (Shop-Standard). */
+export const SHOP_PREVIEW_CAMERA: CharacterPreviewCamera = {
+  fov: 36,
+  position: new THREE.Vector3(0, 0.98, 3.1),
+  lookAt: new THREE.Vector3(0, 0.82, 0),
+}
+
+/** Weitere Einstellung mit vollem Körper sichtbar (Teil: Charakter auf dem Startbildschirm). */
+export const FULL_BODY_PREVIEW_CAMERA: CharacterPreviewCamera = {
+  fov: 32,
+  position: new THREE.Vector3(0, 0.95, 4.1),
+  lookAt: new THREE.Vector3(0, 0.6, 0),
+}
+
+/** Leichtgewichtige Vorschau für Kosmetik-Shop und Startbildschirm: nur Charaktermodell + Licht,
+ * ganz ohne Bahn, Physik oder Kegel - im Gegensatz zu LaneScene, die dafür deutlich zu schwer wäre.
+ * Per Touch/Maus horizontal drehbar, damit man die Ausrüstung von allen Seiten begutachten kann;
+ * ein einfaches Antippen (ohne nennenswerte Bewegung) löst stattdessen sofort eine Idle-Geste aus
+ * (Nutzer-Wunsch: "wenn man drauftippt macht er etwas, springt hoch, jubelt..."). */
 export class CharacterPreviewScene {
   private renderer: THREE.WebGLRenderer
   private scene = new THREE.Scene()
@@ -18,11 +45,15 @@ export class CharacterPreviewScene {
   private rotationY = INITIAL_ROTATION_Y
   private dragging = false
   private lastPointerX = 0
+  private pointerDownAt = 0
+  private totalPointerMovement = 0
   private canvas: HTMLCanvasElement
 
   private onPointerDown = (e: PointerEvent) => {
     this.dragging = true
     this.lastPointerX = e.clientX
+    this.pointerDownAt = performance.now()
+    this.totalPointerMovement = 0
     this.canvas.setPointerCapture(e.pointerId)
   }
 
@@ -30,15 +61,23 @@ export class CharacterPreviewScene {
     if (!this.dragging) return
     const dx = e.clientX - this.lastPointerX
     this.lastPointerX = e.clientX
+    this.totalPointerMovement += Math.abs(dx)
     this.rotationY += dx * DRAG_SENSITIVITY
     if (this.model) this.model.group.rotation.y = this.rotationY
   }
 
   private onPointerUp = () => {
+    if (
+      this.dragging &&
+      this.totalPointerMovement < TAP_MAX_MOVEMENT &&
+      performance.now() - this.pointerDownAt < TAP_MAX_DURATION_MS
+    ) {
+      this.model?.triggerFidget()
+    }
     this.dragging = false
   }
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, cameraConfig: CharacterPreviewCamera = SHOP_PREVIEW_CAMERA) {
     this.canvas = canvas
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -47,9 +86,14 @@ export class CharacterPreviewScene {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.05
 
-    this.camera = new THREE.PerspectiveCamera(36, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 10)
-    this.camera.position.set(0, 0.98, 3.1)
-    this.camera.lookAt(0, 0.82, 0)
+    this.camera = new THREE.PerspectiveCamera(
+      cameraConfig.fov,
+      canvas.clientWidth / Math.max(canvas.clientHeight, 1),
+      0.1,
+      10,
+    )
+    this.camera.position.copy(cameraConfig.position)
+    this.camera.lookAt(cameraConfig.lookAt)
 
     const hemi = new THREE.HemisphereLight(0xfff0d8, 0x445533, 0.9)
     this.scene.add(hemi)

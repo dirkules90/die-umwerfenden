@@ -199,9 +199,11 @@ export function GameScreen() {
             <span>{playerConfig.name}</span>
             <span>{personalBest !== null && personalBest !== undefined ? String(personalBest).padStart(3, '0') : '–'}</span>
           </div>
-          <div style={{ opacity: 0.8, fontSize: '0.75rem', marginTop: '0.3rem' }}>Highscore</div>
+          <div style={{ opacity: 0.8, fontSize: '0.75rem', marginTop: '0.3rem' }}>
+            {groupBest && groupBest.playerNames.length > 1 ? 'Highscore (geteilt)' : 'Highscore'}
+          </div>
           <div className="hud-ranking-row">
-            <span>{groupBest?.playerName ?? '–'}</span>
+            <span>{groupBest ? groupBest.playerNames.join(' & ') : '–'}</span>
             <span>{groupBest ? String(groupBest.value).padStart(3, '0') : '–'}</span>
           </div>
         </div>

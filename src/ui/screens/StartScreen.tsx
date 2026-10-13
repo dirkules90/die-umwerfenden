@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { useGameStore } from '../../state/gameStore'
 import { FullscreenButton } from '../components/FullscreenButton'
 import { AmbientBackground } from '../components/AmbientBackground'
@@ -11,6 +11,13 @@ import {
   WEEKLY_CHALLENGE_BONUS_COINS,
 } from '../../game/achievements'
 import { currentWeekKey } from '../../game/dateKey'
+
+// 3D-Charaktervorschau erst laden, wenn wirklich eingeloggt ist (Teil 16.2-Muster wie
+// GameScreen/ShopScreen) - der Start-Bildschirm selbst darf dadurch weiterhin ganz ohne
+// WebGL-Overhead sofort erscheinen.
+const StartCharacterPreview = lazy(() =>
+  import('../components/StartCharacterPreview').then((m) => ({ default: m.StartCharacterPreview })),
+)
 
 export function StartScreen() {
   const goTo = useGameStore((s) => s.goTo)
@@ -55,6 +62,11 @@ export function StartScreen() {
             Wechseln
           </button>
         </div>
+      )}
+      {currentPlayer && (
+        <Suspense fallback={null}>
+          <StartCharacterPreview playerId={currentPlayer} />
+        </Suspense>
       )}
       <div className="panel daily-challenge-panel">
         <div className="daily-challenge-title">🎯 Wochenaufgabe: {challenge.title}</div>

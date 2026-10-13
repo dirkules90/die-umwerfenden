@@ -9,13 +9,22 @@ export function AllTimeScreen() {
   const allTimeWeeklyWins = useGameStore((s) => s.allTimeWeeklyWins)
   const goTo = useGameStore((s) => s.goTo)
 
-  const rows = CHARACTER_ORDER.map((id) => ({
+  const sortedRows = CHARACTER_ORDER.map((id) => ({
     id,
     points: allTimeBoard[id] ?? 0,
     weeklyWins: allTimeWeeklyWins[id] ?? 0,
   }))
     .filter((r) => r.points > 0 || r.weeklyWins > 0)
     .sort((a, b) => b.points - a.points)
+
+  // Geteilter Rang bei Punktgleichstand (Nutzer-Frage: "was ist wenn zwei den gleichen
+  // [Allzeit-]Bestwert haben?") - vorher bekam bei exakt gleicher Punktsumme der/die Zweite trotzdem
+  // Rang 2 statt sich Rang 1 zu teilen, rein weil CHARACTER_ORDER zufällig so sortiert.
+  let lastRank = 0
+  const rows = sortedRows.map((row, i) => {
+    if (i === 0 || row.points !== sortedRows[i - 1].points) lastRank = i + 1
+    return { ...row, displayRank: lastRank }
+  })
 
   return (
     <div className="screen">
@@ -45,9 +54,9 @@ export function AllTimeScreen() {
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ id, points, weeklyWins }, i) => (
+              {rows.map(({ id, points, weeklyWins, displayRank }) => (
                 <tr key={id}>
-                  <td>{i + 1}</td>
+                  <td>{displayRank}</td>
                   <td>{AVATAR_CONFIGS[id].name}</td>
                   <td>{formatPoints(points)}</td>
                   <td>{weeklyWins > 0 ? formatPoints(weeklyWins) : '–'}</td>

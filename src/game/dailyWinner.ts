@@ -1,5 +1,5 @@
 import { ACHIEVEMENT_DEFS } from './achievements'
-import { dateKeyFor } from './dateKey'
+import { dateKeyFor, todayKey, weekKeyFor } from './dateKey'
 import type { CharacterId, PlayerStatistics } from './types'
 
 /** Tagesbestwerte je Spieler (Teil: Tagessieger). Nur befüllt, sobald ein Spiel dieser
@@ -118,6 +118,59 @@ export function computeTotalDailyPoints(
   mergePoints(total, computeDailyPoints(records))
   mergePoints(total, computeAchievementBonus(statistics, dateKey))
   return total
+}
+
+export interface PointsBreakdown {
+  /** Rang-Punkte (Hausnummer/Tannenbaum-Tagesbestwerte) aus bereits abgeschlossenen Tagen dieser
+   * Woche - EIN Topf statt einer Tag-für-Tag-Aufschlüsselung, weil der Einzeltag-Stand beim
+   * Tagesabschluss nicht separat gespeichert wird, nur die Summe (siehe
+   * state/gameStore.ts processDailyAndWeeklyRollover). Punkte aus bereits abgeschlossenen Tagen
+   * sind endgültig - ein später von jemand anderem übernommener Rekord nimmt sie NICHT wieder weg,
+   * nur der noch laufende heutige Tag ist vorläufig (siehe todayCategoryPointsLive). */
+  pastDaysCategoryPoints: number
+  /** Achievement-Bonus dieser Kalenderwoche, inklusive eines heute schon freigeschalteten. */
+  achievementBonusThisWeek: number
+  /** Bereits synchronisierter Duell-Wochenbonus (siehe backend/duels.ts weeklyDuelBonusPoints). */
+  duelBonusThisWeek: number
+  /** Rang-Punkte des noch laufenden heutigen Tages - ändert sich, bis der Tag endet, deshalb
+   * separat von pastDaysCategoryPoints ausgewiesen (Nutzer-Frage: "woher kommen die Punkte",
+   * verbunden mit der Sorge, ob sie wieder verschwinden können). */
+  todayCategoryPointsLive: number
+}
+
+/** Setzt die Wochenpunktsumme eines Charakters aus ihren Quellen zusammen (Teil: Punkte-
+ * Transparenz) - rein aus bereits vorhandenen, persistierten Werten berechnet (weeklyPoints,
+ * weeklyDuelBonusSynced, Achievement-Zeitstempel), ohne eigene neue Speicherung: die Summe aller
+ * vier Felder entspricht exakt der in der Bestenliste gezeigten Gesamtsumme. */
+export function computePointsBreakdown(
+  id: CharacterId,
+  dailyRecords: DailyRecords,
+  statistics: Partial<Record<CharacterId, PlayerStatistics>>,
+  weeklyPoints: Partial<Record<CharacterId, number>>,
+  weeklyDuelBonusSynced: Partial<Record<CharacterId, number>>,
+  weekKey: string,
+): PointsBreakdown {
+  const stats = statistics[id]
+  const duelBonusThisWeek = weeklyDuelBonusSynced[id] ?? 0
+
+  let achievementBonusThisWeek = 0
+  let todayAchievementBonus = 0
+  if (stats) {
+    const today = todayKey()
+    for (const a of stats.achievements) {
+      if (weekKeyFor(new Date(a.unlockedAt)) !== weekKey) continue
+      const value = ACHIEVEMENT_BONUS_BY_ID[a.id] ?? 0
+      achievementBonusThisWeek += value
+      if (dateKeyFor(new Date(a.unlockedAt)) === today) todayAchievementBonus += value
+    }
+  }
+
+  const pastDaysTotal = (weeklyPoints[id] ?? 0) - duelBonusThisWeek
+  const pastDaysAchievement = achievementBonusThisWeek - todayAchievementBonus
+  const pastDaysCategoryPoints = pastDaysTotal - pastDaysAchievement
+  const todayCategoryPointsLive = computeDailyPoints(dailyRecords)[id] ?? 0
+
+  return { pastDaysCategoryPoints, achievementBonusThisWeek, duelBonusThisWeek, todayCategoryPointsLive }
 }
 
 /** Tagessieger: alle Spieler mit der höchsten Punktzahl, sofern diese über 0 liegt. */

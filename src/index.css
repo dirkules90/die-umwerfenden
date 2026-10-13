@@ -1237,6 +1237,41 @@ h3 {
   font-size: 0.75rem;
 }
 
+/* Große, drehbare 3D-Charaktervorschau auf dem Startbildschirm (Teil: Charakter-Vorschau) - zeigt
+   den eingeloggten Charakter mit allen ausgerüsteten Kosmetik-Items. */
+.start-character-preview {
+  position: relative;
+  width: min(60vw, 14rem);
+  height: 13rem;
+  /* Ohne das hier schrumpft Flexbox (.screen ist eine Flex-Spalte mit vielen Kindern) dieses
+     Element gegen seine explizite Höhe zusammen, sobald der Inhalt nicht in den sichtbaren
+     Viewport passt, statt die ohnehin schon vorhandene overflow-y:auto-Scrollbarkeit von .screen
+     zu nutzen (Bugfix: Vorschau-Canvas wurde auf ~40px Höhe zusammengequetscht). */
+  flex-shrink: 0;
+  border-radius: 20px;
+  overflow: hidden;
+  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04));
+}
+
+.start-character-preview-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: grab;
+  touch-action: none;
+}
+
+.start-character-preview-hint {
+  position: absolute;
+  bottom: 0.35rem;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 0.62rem;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
 /* Ungelesene-Duell-Ergebnisse-Badge auf dem Start-Bildschirm (Teil: Online-Duelle). */
 .duel-badge-btn {
   position: relative;

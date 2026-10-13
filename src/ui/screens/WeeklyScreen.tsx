@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useGameStore } from '../../state/gameStore'
 import { AVATAR_CONFIGS, CHARACTER_ORDER } from '../../characters/avatarConfigs'
-import { computeTotalDailyPoints, dailyWinners } from '../../game/dailyWinner'
+import { computePointsBreakdown, computeTotalDailyPoints, dailyWinners } from '../../game/dailyWinner'
 import { currentWeekKey, mondayOfWeek, todayKey } from '../../game/dateKey'
 import { WEEKLY_WINNER_COIN_BONUS } from '../../game/coins'
 import { ACHIEVEMENT_DEFS, hasAchievementThisWeek } from '../../game/achievements'
@@ -26,6 +26,8 @@ export function WeeklyScreen() {
   const weeklyPoints = useGameStore((s) => s.weeklyPoints)
   const dailyRecords = useGameStore((s) => s.dailyRecords)
   const statistics = useGameStore((s) => s.statistics)
+  const weeklyDuelBonusSynced = useGameStore((s) => s.weeklyDuelBonusSynced)
+  const weekKey = useGameStore((s) => s.weekKey)
   const syncWeeklyDuelBonus = useGameStore((s) => s.syncWeeklyDuelBonus)
   const goTo = useGameStore((s) => s.goTo)
   const [selected, setSelected] = useState<CharacterId>('daniel')
@@ -55,6 +57,11 @@ export function WeeklyScreen() {
   const detailStats = statistics[selected] ?? emptyStatistics()
   const avgHigh = detailStats.countHigh > 0 ? (detailStats.totalScoreHigh / detailStats.countHigh).toFixed(1) : '–'
   const avgLow = detailStats.countLow > 0 ? (detailStats.totalScoreLow / detailStats.countLow).toFixed(1) : '–'
+
+  // Punkte-Herkunft für den ausgewählten Spieler (Teil: Punkte-Transparenz, Nutzer-Frage "ich habe
+  // aktuell drei Punkte - woher kommen die?") - rein aus bereits vorhandenen Werten berechnet, die
+  // Summe entspricht exakt dem oben in der Tabelle gezeigten Gesamtwert.
+  const breakdown = computePointsBreakdown(selected, dailyRecords, statistics, weeklyPoints, weeklyDuelBonusSynced, weekKey)
 
   return (
     <div className="screen">
@@ -112,10 +119,11 @@ export function WeeklyScreen() {
         </table>
       </div>
       <p style={{ maxWidth: '32rem', fontSize: '0.68rem', opacity: 0.65, margin: 0 }}>
-        Wochenpunkte = Summe der Tagespunkte (Hausnummer Platz 1-3 = 3/2/1, Tannenbaum Platz 1-3 = 6/4/2, plus
-        Achievement-Bonuspunkte) plus Duell-Bonuspunkte (0,5 Punkte pro Teilnehmer ab dem zweiten, max. 2,5, für
-        gewonnene Duelle). Noch nicht abgeschlossene (heutige) Punkte zählen hier schon live mit, werden aber erst
-        beim Tagesabschluss dauerhaft gespeichert.
+        Wochenpunkte = Summe der Tagespunkte (Hausnummer Platz 1-3 = 3/2/1, Tannenbaum Platz 1-3 = 12/8/4, plus
+        Achievement-Bonuspunkte) plus Duell-Bonuspunkte (0,5 Punkte je Teilnehmer für gewonnene Duelle, bei
+        Gleichstand im Duell unter den Gewinnern aufgeteilt). Noch nicht abgeschlossene (heutige) Punkte zählen hier
+        schon live mit, werden aber erst beim Tagesabschluss dauerhaft gespeichert - siehe die Aufschlüsselung unten
+        für den ausgewählten Spieler.
       </p>
 
       <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -129,6 +137,35 @@ export function WeeklyScreen() {
             {AVATAR_CONFIGS[id].name}
           </button>
         ))}
+      </div>
+
+      <div className="panel" style={{ maxWidth: '30rem', width: '100%' }}>
+        <h3 style={{ marginTop: 0 }}>Woher kommen {AVATAR_CONFIGS[selected].name}s Punkte?</h3>
+        <table className="stats-table">
+          <tbody>
+            <tr>
+              <td>Bereits abgeschlossene Tage dieser Woche</td>
+              <td>{breakdown.pastDaysCategoryPoints > 0 ? formatPoints(breakdown.pastDaysCategoryPoints) : '–'}</td>
+            </tr>
+            <tr>
+              <td>Achievement-Bonus diese Woche</td>
+              <td>{breakdown.achievementBonusThisWeek > 0 ? formatPoints(breakdown.achievementBonusThisWeek) : '–'}</td>
+            </tr>
+            <tr>
+              <td>Duell-Bonus diese Woche</td>
+              <td>{breakdown.duelBonusThisWeek > 0 ? formatPoints(breakdown.duelBonusThisWeek) : '–'}</td>
+            </tr>
+            <tr>
+              <td>Heute (läuft noch, vorläufig)</td>
+              <td>{breakdown.todayCategoryPointsLive > 0 ? formatPoints(breakdown.todayCategoryPointsLive) : '–'}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p style={{ margin: '0.6rem 0 0', fontSize: '0.68rem', opacity: 0.65 }}>
+          Punkte aus bereits abgeschlossenen Tagen sind endgültig gespeichert - ein später von jemand anderem
+          übernommener Tagesbestwert nimmt sie nicht wieder weg. Nur die heutigen, noch laufenden Punkte können sich
+          bis zum Tagesabschluss noch ändern.
+        </p>
       </div>
 
       <div className="panel" style={{ maxWidth: '30rem', width: '100%' }}>

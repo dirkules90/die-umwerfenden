@@ -38,12 +38,14 @@ const SPLIT_COUNT: Record<DuelSplitMode, number> = { winner_takes_all: 1, top2: 
 
 const NETWORK_ERROR = 'Keine Verbindung zum Server. Bitte Internetverbindung prüfen und erneut versuchen.'
 
-/** Wochenpunkte-Bonus für Duell-Gewinner (Teil: Wochenbewertung) - 0,5 Punkte pro Teilnehmer ab dem
- * zweiten, gedeckelt bei 2,5 (bei maximal 6 Charakteren in der Gruppe ohnehin die natürliche
- * Obergrenze) - bewusst klein gehalten, der Haupt-Reiz eines Duells ist der Münz-Einsatz, nicht die
- * Bestenliste (Nutzer-Feedback: "Fördert auf jeden Fall das Spiel", aber nicht dominant). */
+/** Wochenpunkte-Bonus für Duell-Gewinner (Teil: Wochenbewertung) - 0,5 Punkte je Teilnehmer (den
+ * Gewinner selbst mitgezählt), landen bei Gleichstand im Duell zu gleichen Teilen bei allen
+ * Gewinnern (siehe selectWinners/tryResolveDuel unten). Kein künstlicher Deckel mehr nötig - bei
+ * maximal 6 Charakteren in der Gruppe sind das ohnehin nie mehr als 3,0 Punkte. Bewusst klein
+ * gehalten, der Haupt-Reiz eines Duells ist der Münz-Einsatz, nicht die Bestenliste (Nutzer-
+ * Feedback: "Fördert auf jeden Fall das Spiel", aber nicht dominant). */
 export function weeklyDuelBonusPoints(participantCount: number): number {
-  return Math.min(0.5 * (participantCount - 1), 2.5)
+  return 0.5 * participantCount
 }
 
 /** Netzwerkfehler (z. B. offline) lassen die zugrunde liegenden Supabase-Aufrufe die Promise
@@ -252,7 +254,10 @@ async function tryResolveDuel(duelId: string): Promise<void> {
     let remainder = pot - share * winners.length
 
     const weekKey = weekKeyFor(new Date())
-    const bonusPoints = weeklyDuelBonusPoints(accepted.length)
+    // Bei Gleichstand im Duell teilen sich die Gewinner den Punkte-Topf (analog zum Münz-Pott oben),
+    // statt dass jede(r) Gewinner(in) den vollen Betrag bekommt (Nutzer-Vorgabe: "die Sieger teilen
+    // es sich auf wenn mehrere gewinnen").
+    const bonusPointsShare = weeklyDuelBonusPoints(accepted.length) / winners.length
 
     for (const p of accepted) {
       const isWinner = winners.some((w) => w.character_id === p.character_id)
@@ -261,7 +266,7 @@ async function tryResolveDuel(duelId: string): Promise<void> {
         grossPayout = share + (remainder > 0 ? 1 : 0)
         if (remainder > 0) remainder -= 1
         syncCoinTransactionBestEffort(p.character_id, grossPayout, 'duel_win', { duelId, mode: duel.mode })
-        void addWeeklyDuelPoints(p.character_id, weekKey, bonusPoints)
+        void addWeeklyDuelPoints(p.character_id, weekKey, bonusPointsShare)
       }
       await supabase
         .from('duel_participants')

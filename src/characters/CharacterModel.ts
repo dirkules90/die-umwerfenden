@@ -690,6 +690,17 @@ export class CharacterModel {
     this.backswingAmount = THREE.MathUtils.clamp(amount, 0, 1)
   }
 
+  /** Löst sofort eine zufällige Idle-Geste aus, statt auf den Zufallstimer zu warten (Teil:
+   * Charakter-Vorschau auf dem Startbildschirm, Nutzer-Wunsch: "wenn man drauftippt macht er
+   * etwas"). Wirkungslos außerhalb echter Ruhehaltung oder während bereits eine Geste läuft, damit
+   * wiederholtes Antippen keine Gesten überlagert. */
+  triggerFidget() {
+    if (this.state !== 'idle' || this.fidgetKind !== 'none') return
+    const kinds = ['wink', 'fistpump', 'laugh'] as const
+    this.fidgetKind = kinds[Math.floor(Math.random() * kinds.length)]
+    this.fidgetElapsed = 0
+  }
+
   update(dt: number) {
     this.time += dt
     this.stateElapsed += dt
