@@ -10,6 +10,8 @@ import { DuelsScreen } from './ui/screens/DuelsScreen'
 import { CoinHistoryScreen } from './ui/screens/CoinHistoryScreen'
 import { AchievementBanner } from './ui/components/AchievementBanner'
 import { LoadingScreen } from './ui/components/LoadingScreen'
+import { OfflineBanner } from './ui/components/OfflineBanner'
+import { useOnlineStatus } from './ui/hooks/useOnlineStatus'
 
 // 3D-/Physik-Stack (Three.js + Rapier.js) erst laden, wenn tatsächlich gespielt wird (Teil 16.2).
 const GameScreen = lazy(() => import('./ui/screens/GameScreen').then((m) => ({ default: m.GameScreen })))
@@ -62,6 +64,10 @@ function ScreenRouter() {
 
 export default function App() {
   const syncWeeklyDuelBonus = useGameStore((s) => s.syncWeeklyDuelBonus)
+  const loadWalletBalances = useGameStore((s) => s.loadWalletBalances)
+  const loadDuels = useGameStore((s) => s.loadDuels)
+  const currentPlayer = useGameStore((s) => s.currentPlayer)
+  const isOnline = useOnlineStatus()
 
   // Duell-Wochenbonus bei jedem App-Start nachziehen (Teil: Wochenbewertung) - deckt "man kommt
   // später wieder rein" ab, ohne dass man extra die Wochen-Bestenliste öffnen müsste (die tut es
@@ -70,10 +76,22 @@ export default function App() {
     void syncWeeklyDuelBonus()
   }, [syncWeeklyDuelBonus])
 
+  // Offline-Robustheit: sobald die Verbindung zurückkommt (z. B. nach Funkloch beim Spielen auf
+  // dem Vereinsgelände), die backend-abhängigen Daten automatisch nachziehen, statt dass man erst
+  // manuell den Bildschirm wechseln oder neu laden muss, um wieder einen aktuellen Stand zu sehen.
+  useEffect(() => {
+    if (!isOnline || !currentPlayer) return
+    void loadWalletBalances()
+    void loadDuels()
+    void syncWeeklyDuelBonus()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOnline])
+
   return (
     <>
       <ScreenRouter />
       <AchievementBanner />
+      <OfflineBanner />
       <div className="orientation-warning">
         <div className="rotate-icon">📱</div>
         <h2>Bitte Gerät drehen</h2>

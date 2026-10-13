@@ -544,6 +544,33 @@ h3 {
   to { transform: translateX(-50%) translateY(0); opacity: 1; }
 }
 
+/* Offline-Hinweis (Teil: Offline-Robustheit) - unten statt oben platziert, damit er sich nicht
+   mit dem Achievement-Banner oder Kopfzeilen-UI der einzelnen Screens beißt; dunkles Warnrot statt
+   Gelb/Grün, damit er sich klar von normalen Erfolgs-/Hinweis-Bannern unterscheidet. */
+.offline-banner {
+  position: fixed;
+  bottom: env(safe-area-inset-bottom, 1rem);
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(92vw, 520px);
+  background: linear-gradient(90deg, #a93226, var(--warnrot));
+  color: var(--text-light);
+  padding: 0.65rem 1.2rem;
+  border-radius: 14px;
+  font-weight: 600;
+  font-size: 0.92rem;
+  text-align: center;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  z-index: 60;
+  pointer-events: none;
+  animation: offline-banner-pop 0.3s ease;
+}
+
+@keyframes offline-banner-pop {
+  from { transform: translateX(-50%) translateY(30px); opacity: 0; }
+  to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+
 .leaderboard-tabs {
   display: flex;
   gap: 0.4rem;
