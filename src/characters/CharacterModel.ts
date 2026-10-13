@@ -657,12 +657,15 @@ export class CharacterModel {
       this.state = state
       this.stateElapsed = 0
       this.applyMood(STATE_MOOD[state])
-      if (state === 'cheer' || state === 'meh' || state === 'disappointed') {
-        // Saubere Ausgangshaltung für die Reaktion, statt eine Neigung aus dem vorherigen Wurf
-        // (z.B. das Vorlehnen am Ende von 'throw') unbeabsichtigt mit hinüberzunehmen.
-        this.torsoGroup.rotation.set(0, 0, 0)
-        this.headGroup.rotation.set(0, 0, 0)
-      }
+      // Saubere Ausgangshaltung bei JEDEM Zustandswechsel (vorher nur für cheer/meh/disappointed) -
+      // seit 'throw' auch torsoGroup.rotation.y (Taillendrehung) setzt, würde ein direkter Wechsel
+      // zurück zu 'idle' (das nur rotation.z anfasst) diese Drehung sonst stehen lassen (Bugfix:
+      // Charakter blieb nach dem Wurf sichtbar verdreht). group.position nur in y zurückgesetzt,
+      // NICHT per .set() - x/z werden extern von LaneScene auf die Standposition gesetzt (siehe
+      // CHARACTER_STAND) und dürfen hier nicht überschrieben werden.
+      this.torsoGroup.rotation.set(0, 0, 0)
+      this.headGroup.rotation.set(0, 0, 0)
+      this.group.position.y = 0
     }
   }
 
@@ -693,19 +696,33 @@ export class CharacterModel {
         break
       }
       case 'backswing': {
+        // Ganzkörper-Ausholbewegung statt nur eines rotierenden Arms (Nutzer-Feedback: "der Arm
+        // bewegt sich, das wars oder?") - Gegenarm schwingt gegenläufig mit (Balance, wie beim
+        // natürlichen Gehen/Werfen), Oberkörper lehnt sich spürbar zurück UND dreht sich leicht aus
+        // der Hüfte (rotation.y), dazu ein deutlicheres Einsinken als vorher.
+        // headGroup hängt an torsoGroup (siehe Konstruktor) - bei der Nahaufnahme direkt nach dem
+        // Loslassen (siehe LaneScene THROW_ANIM_DURATION_MS) wirkt dieselbe Rotationsamplitude am
+        // Kopf viel stärker als am Torso selbst, da der Kopf weit vom Drehpunkt entfernt sitzt.
+        // Torso-Werte deshalb bewusst moderater als die Arme, sonst sieht die Bewegung wie ein
+        // Stolpern statt wie ein kontrollierter Wurf aus.
         const amt = this.backswingAmount
-        this.rightArmPivot.rotation.x = -amt * 1.7
-        this.torsoGroup.rotation.x = amt * 0.15
-        // Leichtes Einsinken beim Ausholen, damit der Wurf wie eine echte Körperbewegung wirkt statt
-        // nur eine reine Armdrehung zu sein (Teil: Wurf-Animation).
-        this.group.position.y = -amt * 0.045
+        this.rightArmPivot.rotation.x = -amt * 1.9
+        this.leftArmPivot.rotation.x = amt * 0.4
+        this.torsoGroup.rotation.x = amt * 0.16
+        this.torsoGroup.rotation.y = -amt * 0.08
+        this.group.position.y = -amt * 0.06
         break
       }
       case 'throw': {
-        const t = Math.min(this.stateElapsed / 0.4, 1)
-        this.rightArmPivot.rotation.x = THREE.MathUtils.lerp(-1.7, 0.7, t)
-        this.torsoGroup.rotation.x = THREE.MathUtils.lerp(0.15, -0.05, t)
-        this.group.position.y = THREE.MathUtils.lerp(-0.045, 0, t)
+        const raw = Math.min(this.stateElapsed / 0.4, 1)
+        // Leichtes Überschwingen statt linearem Verlauf, für einen spürbaren "Schwung-Snap" im
+        // Release-Moment statt einer gleichförmigen Armbewegung.
+        const t = 1 - Math.pow(1 - raw, 2.4)
+        this.rightArmPivot.rotation.x = THREE.MathUtils.lerp(-1.9, 1.2, t)
+        this.leftArmPivot.rotation.x = THREE.MathUtils.lerp(0.4, -0.55, t)
+        this.torsoGroup.rotation.x = THREE.MathUtils.lerp(0.16, -0.22, t)
+        this.torsoGroup.rotation.y = THREE.MathUtils.lerp(-0.08, 0.11, t)
+        this.group.position.y = THREE.MathUtils.lerp(-0.06, 0.015, t)
         break
       }
       case 'cheer': {
