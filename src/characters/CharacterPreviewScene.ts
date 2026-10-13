@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { CharacterModel } from './CharacterModel'
+import { ParticleSystem } from '../scene/ParticleFX'
 import type { AvatarConfig, CosmeticLoadout } from '../game/types'
 
 const INITIAL_ROTATION_Y = Math.PI * 0.12
@@ -23,11 +24,17 @@ export const SHOP_PREVIEW_CAMERA: CharacterPreviewCamera = {
   lookAt: new THREE.Vector3(0, 0.82, 0),
 }
 
-/** Weitere Einstellung mit vollem Körper sichtbar (Teil: Charakter auf dem Startbildschirm). */
+/** Weitere Einstellung mit vollem Körper sichtbar (Teil: Charakter auf dem Startbildschirm) - für
+ * den seitlich stehenden, eher hochformatigen Rahmen dort etwas näher heran als die Shop-Variante,
+ * damit der Charakter trotz der schmalen Breite präsent/groß wirkt statt klein in der Mitte zu
+ * stehen (Nutzer-Wunsch: "größer/präsenter hinstellen"). lookAt liegt bewusst unterhalb der
+ * Körpermitte und die Kamera etwas weiter weg als rein fürs Stehbild nötig - der Jubel-Doppelsprung-
+ * Fidget hebt den Kopf per group.position.y+Sprung deutlich an (Nutzer-Wunsch: "komplexere
+ * Bewegungen"), ohne dieses Polster würde der Kopf dabei oben aus dem Bild laufen. */
 export const FULL_BODY_PREVIEW_CAMERA: CharacterPreviewCamera = {
-  fov: 32,
-  position: new THREE.Vector3(0, 0.95, 4.1),
-  lookAt: new THREE.Vector3(0, 0.6, 0),
+  fov: 30,
+  position: new THREE.Vector3(0, 0.78, 3.6),
+  lookAt: new THREE.Vector3(0, 0.52, 0),
 }
 
 /** Leichtgewichtige Vorschau für Kosmetik-Shop und Startbildschirm: nur Charaktermodell + Licht,
@@ -41,6 +48,7 @@ export class CharacterPreviewScene {
   private camera: THREE.PerspectiveCamera
   private clock = new THREE.Clock()
   private model: CharacterModel | null = null
+  private particles: ParticleSystem
   private disposed = false
   private rotationY = INITIAL_ROTATION_Y
   private dragging = false
@@ -103,6 +111,8 @@ export class CharacterPreviewScene {
     const fill = new THREE.AmbientLight(0xfff2e0, 0.35)
     this.scene.add(fill)
 
+    this.particles = new ParticleSystem(this.scene)
+
     canvas.style.touchAction = 'none'
     canvas.addEventListener('pointerdown', this.onPointerDown)
     canvas.addEventListener('pointermove', this.onPointerMove)
@@ -130,6 +140,9 @@ export class CharacterPreviewScene {
     if (this.disposed) return
     const dt = Math.min(this.clock.getDelta(), 0.05)
     this.model?.update(dt)
+    const confettiPos = this.model?.consumeConfettiBurst()
+    if (confettiPos) this.particles.burstConfetti(confettiPos)
+    this.particles.update(dt)
     this.renderer.render(this.scene, this.camera)
   }
 
@@ -141,6 +154,7 @@ export class CharacterPreviewScene {
     this.canvas.removeEventListener('pointerup', this.onPointerUp)
     this.canvas.removeEventListener('pointercancel', this.onPointerUp)
     this.canvas.removeEventListener('pointerleave', this.onPointerUp)
+    this.particles.dispose()
     this.renderer.dispose()
   }
 }

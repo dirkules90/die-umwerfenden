@@ -195,9 +195,24 @@ export class CharacterModel {
   private fidgetTimer = 5 + Math.random() * 8
   private fidgetKind: 'none' | 'wink' | 'fistpump' | 'laugh' = 'none'
   private fidgetElapsed = 0
+  // Zusatzzustand für die aufwendigeren Fidgets (Nutzer-Feedback: "Gesten wirken noch zu
+  // langweilig... komplexere Bewegungen"): wie viele Konfetti-Salven ein Fidget in diesem
+  // Durchlauf schon ausgelöst hat (verhindert Mehrfachauslösung pro Schwelle), und wie viel
+  // Zusatzdrehung (volle Umdrehung beim Lach-Wirbel) bereits als Delta auf group.rotation.y
+  // angewendet wurde - als Delta statt absolutem Wert, damit sich das nicht mit einer per Drag
+  // gesetzten Rotation (siehe CharacterPreviewScene) beißt.
+  private fidgetConfettiStage = 0
+  private fidgetSpinApplied = 0
+  private pendingConfettiBurst = false
+  /** Unskalierte Basis-Körpergröße (siehe BUILD_SCALE) - Fidgets wie der Jubel-Doppelsprung
+   * animieren group.scale zusätzlich für einen Stauch-/Streck-Effekt (Teil: Idle-Fidgets) und
+   * müssen danach exakt hierauf zurücksetzen, statt versehentlich eine andere Statur zu
+   * hinterlassen. */
+  private baseScale: number
 
   constructor(config: AvatarConfig, cosmetics: CosmeticLoadout) {
     const scale = BUILD_SCALE[config.build]
+    this.baseScale = scale
     this.group.scale.setScalar(scale)
 
     // Echtes Cel-Shading (Teil: optische Überarbeitung) über den gemeinsamen toonMaterial()-Helfer
@@ -662,6 +677,19 @@ export class CharacterModel {
 
   setAnimState(state: CharacterAnimState) {
     if (this.state !== state) {
+      // Ein mitten im Fidget unterbrochener Idle-Zustand (z.B. Wurf beginnt, während noch
+      // gewinkt/gejubelt wird) muss den Fidget sauber abbrechen statt group.scale/rotation.y
+      // halb animiert stehen zu lassen (Bugfix: Charakter könnte gestaucht/gedreht in die
+      // nächste Animation rutschen).
+      if (this.state === 'idle' && this.fidgetKind !== 'none') {
+        this.group.rotation.y -= this.fidgetSpinApplied
+        this.group.scale.set(this.baseScale, this.baseScale, this.baseScale)
+        this.rightArmPivot.rotation.z = ARM_REST_LEAN
+        this.fidgetKind = 'none'
+        this.fidgetConfettiStage = 0
+        this.fidgetSpinApplied = 0
+        this.pendingConfettiBurst = false
+      }
       this.state = state
       this.stateElapsed = 0
       this.applyMood(STATE_MOOD[state])
@@ -699,6 +727,21 @@ export class CharacterModel {
     const kinds = ['wink', 'fistpump', 'laugh'] as const
     this.fidgetKind = kinds[Math.floor(Math.random() * kinds.length)]
     this.fidgetElapsed = 0
+    this.fidgetConfettiStage = 0
+    this.fidgetSpinApplied = 0
+  }
+
+  /** Vom Host (z.B. CharacterPreviewScene/LaneScene) nach jedem update() abzufragen: gibt einmalig
+   * die aktuelle Weltposition zurück, sobald ein Fidget gerade eine Konfetti-Salve auslösen will
+   * (Teil: Idle-Fidgets, Nutzer-Wunsch: "Konfetti wird gestreut"), danach wieder null bis zur
+   * nächsten Salve. CharacterModel kennt die Host-Szene/das Partikelsystem nicht selbst, meldet
+   * also nur den Zeitpunkt + Ort statt eigene Partikel zu verwalten. */
+  consumeConfettiBurst(): THREE.Vector3 | null {
+    if (!this.pendingConfettiBurst) return null
+    this.pendingConfettiBurst = false
+    const worldPos = new THREE.Vector3()
+    this.headGroup.getWorldPosition(worldPos)
+    return worldPos
   }
 
   update(dt: number) {
@@ -719,6 +762,8 @@ export class CharacterModel {
             const kinds = ['wink', 'fistpump', 'laugh'] as const
             this.fidgetKind = kinds[Math.floor(Math.random() * kinds.length)]
             this.fidgetElapsed = 0
+            this.fidgetConfettiStage = 0
+            this.fidgetSpinApplied = 0
           }
         } else {
           this.fidgetElapsed += dt
@@ -728,8 +773,10 @@ export class CharacterModel {
             this.fidgetTimer = 6 + Math.random() * 9
             this.applyMood('neutral')
             this.rightArmPivot.rotation.x = 0
+            this.rightArmPivot.rotation.z = ARM_REST_LEAN
             this.leftArmPivot.rotation.x = 0
             this.group.position.y = 0
+            this.group.scale.set(this.baseScale, this.baseScale, this.baseScale)
           }
         }
         break
@@ -823,26 +870,70 @@ export class CharacterModel {
   private updateFidget(kind: 'wink' | 'fistpump' | 'laugh', t: number): boolean {
     switch (kind) {
       case 'wink': {
-        const duration = 0.55
+        // Schnelle, aber nicht mehr nur ein Gesichtstextur-Wechsel (Nutzer-Feedback: "Gesten
+        // wirken noch zu langweilig") - ein kurzes "Hey!"-Winken mit dem rechten Arm samt leichtem
+        // Hüpfer, dazu der Kopf-Zwinker-Tilt.
+        const duration = 0.6
+        const p = Math.min(t / duration, 1)
         this.applyMood('wink')
-        this.headGroup.rotation.z = Math.sin(Math.min(t / duration, 1) * Math.PI) * 0.08
+        this.headGroup.rotation.z = Math.sin(p * Math.PI) * 0.1
+        const raise = Math.sin(Math.min(p * 1.3, 1) * Math.PI * 0.5)
+        this.rightArmPivot.rotation.x = -raise * 1.35
+        this.rightArmPivot.rotation.z = ARM_REST_LEAN + Math.sin(t * 26) * 0.3 * raise
+        this.group.position.y = Math.sin(p * Math.PI) * 0.025
         return t >= duration
       }
       case 'fistpump': {
         // Kein Daumen-hoch möglich (der Charakter hat keine beweglichen Finger) - stattdessen ein
-        // kurzer Faustpump: Arm schnellt hoch, hält kurz, kommt zurück.
-        const duration = 1.0
-        const raise = Math.sin(Math.min(t / duration, 1) * Math.PI)
-        this.rightArmPivot.rotation.x = -raise * 2.3
-        this.applyMood(t < duration * 0.85 ? 'happy' : 'neutral')
+        // Jubel-Doppelsprung mit beiden Armen samt Stauch-/Streck-Effekt und zwei
+        // Konfetti-Salven an den Sprungspitzen (Nutzer-Feedback: "komplexere Bewegungen,
+        // Konfetti wird gestreut").
+        const duration = 1.1
+        const p = Math.min(t / duration, 1)
+        // Zwei volle sin-Perioden über die Dauer ergeben zwei Sprünge statt nur einem.
+        const jump = Math.abs(Math.sin(p * Math.PI * 2))
+        this.group.position.y = jump * 0.24
+        this.rightArmPivot.rotation.x = -jump * 2.4
+        this.leftArmPivot.rotation.x = -jump * 2.1
+        // Stauch beim Absprung/Landen, Streckung an der Sprungspitze (klassisches
+        // Squash-and-Stretch für mehr Energie in der Bewegung).
+        const stretch = 1 + jump * 0.12
+        const squash = 1 - jump * 0.06
+        this.group.scale.set(this.baseScale * squash, this.baseScale * stretch, this.baseScale * squash)
+        this.applyMood(p < 0.85 ? 'happy' : 'neutral')
+        if (this.fidgetConfettiStage === 0 && p > 0.2) {
+          this.pendingConfettiBurst = true
+          this.fidgetConfettiStage = 1
+        } else if (this.fidgetConfettiStage === 1 && p > 0.7) {
+          this.pendingConfettiBurst = true
+          this.fidgetConfettiStage = 2
+        }
         return t >= duration
       }
       case 'laugh': {
-        const duration = 0.9
-        const settle = Math.max(0, 1 - t / duration)
-        this.group.position.y = Math.abs(Math.sin(t * 10)) * 0.08 * settle
-        this.torsoGroup.rotation.z = Math.sin(t * 10) * 0.05 * settle
-        this.applyMood(t < duration * 0.85 ? 'happy' : 'neutral')
+        // Lach-Wirbel statt nur eines Wacklers: größerer Hüpfer/Kopf-Wackeln PLUS eine volle
+        // 360°-Drehung in der Mitte der Geste, dazu eine Konfetti-Salve am Drehpunkt.
+        const duration = 1.1
+        const p = Math.min(t / duration, 1)
+        const settle = 1 - p
+        this.group.position.y = Math.abs(Math.sin(t * 11)) * 0.13 * settle
+        this.torsoGroup.rotation.z = Math.sin(t * 11) * 0.08 * settle
+        this.headGroup.rotation.x = Math.sin(t * 11 + 0.4) * 0.06 * settle
+
+        // Volle Umdrehung als DELTA auf group.rotation.y, nicht als absoluter Wert - sonst würde
+        // eine per Drag gesetzte Ausgangsdrehung (siehe CharacterPreviewScene) überschrieben. Am
+        // Ende ist der Netto-Effekt exakt +360°, der Charakter landet also wieder in der
+        // ursprünglichen Blickrichtung.
+        const spinP = THREE.MathUtils.clamp((p - 0.15) / 0.65, 0, 1)
+        const targetSpin = (1 - Math.pow(1 - spinP, 2)) * Math.PI * 2
+        this.group.rotation.y += targetSpin - this.fidgetSpinApplied
+        this.fidgetSpinApplied = targetSpin
+
+        this.applyMood(p < 0.85 ? 'happy' : 'neutral')
+        if (this.fidgetConfettiStage === 0 && p > 0.45) {
+          this.pendingConfettiBurst = true
+          this.fidgetConfettiStage = 1
+        }
         return t >= duration
       }
     }
@@ -850,12 +941,16 @@ export class CharacterModel {
 
   resetPose() {
     this.group.position.y = 0
+    this.group.scale.set(this.baseScale, this.baseScale, this.baseScale)
     this.headGroup.rotation.set(0, 0, 0)
     this.torsoGroup.rotation.set(0, 0, 0)
     this.leftArmPivot.rotation.set(0, 0, -ARM_REST_LEAN)
     this.rightArmPivot.rotation.set(0, 0, ARM_REST_LEAN)
     this.fidgetKind = 'none'
     this.fidgetElapsed = 0
+    this.fidgetConfettiStage = 0
+    this.fidgetSpinApplied = 0
+    this.pendingConfettiBurst = false
     this.setAnimState('idle')
   }
 }

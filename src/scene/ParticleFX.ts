@@ -17,6 +17,10 @@ function buildSoftDotTexture(): THREE.Texture {
   return texture
 }
 
+// Bunte Partyfarben statt eines einzelnen Tons (Teil: Idle-Fidgets, Nutzer-Wunsch "Konfetti wird
+// gestreut") - jedes Partikel bekommt beim Spawnen eine zufällige davon.
+const CONFETTI_COLORS = [0xff4d6d, 0xffd93d, 0x4dd4ff, 0x6bff6b, 0xb46dff, 0xffa94d]
+
 interface Particle {
   sprite: THREE.Sprite
   velocity: THREE.Vector3
@@ -59,6 +63,31 @@ export class ParticleSystem {
         startScale: 0.05 + Math.random() * 0.03,
         endScale: 0.16 + Math.random() * 0.06,
         opacity: 0.55,
+      })
+    }
+  }
+
+  /** Konfetti-Salve für Idle-Fidget-Jubelmomente (Teil: Charakter-Vorschau, siehe
+   * CharacterModel.consumeConfettiBurst) - bunt gemischt statt eines einzelnen Tons, höhere und
+   * breiter gestreute Flugbahn als die Staubwolke, damit es wie geworfenes Konfetti statt wie ein
+   * Treffer-Einschlag wirkt. */
+  burstConfetti(position: THREE.Vector3) {
+    const count = 18
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2
+      const spread = 0.5 + Math.random() * 1.3
+      const velocity = new THREE.Vector3(
+        Math.cos(angle) * spread,
+        1.7 + Math.random() * 1.6,
+        Math.sin(angle) * spread,
+      )
+      this.spawn(position, velocity, {
+        gravity: 2.1,
+        lifetime: 0.9 + Math.random() * 0.6,
+        color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+        startScale: 0.055,
+        endScale: 0.02,
+        opacity: 0.95,
       })
     }
   }

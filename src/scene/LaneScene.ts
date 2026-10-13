@@ -499,6 +499,11 @@ export class LaneScene {
     for (const pin of this.pins) pin.syncMesh()
 
     this.character?.update(rawDt)
+    // Idle-Fidgets des Charakters können auch während des echten Spiels (z.B. Wartezeit vor dem
+    // ersten Wurf) eine Konfetti-Salve auslösen wollen (Teil: Idle-Fidgets) - dasselbe
+    // Partikelsystem wie für Kegel-Staub/Rollspur übernimmt das hier gleich mit.
+    const confettiPos = this.character?.consumeConfettiBurst()
+    if (confettiPos) this.particles.burstConfetti(confettiPos)
     this.animator.update(rawDt)
     this.cameraRig.update(rawDt)
     this.particles.update(rawDt)
