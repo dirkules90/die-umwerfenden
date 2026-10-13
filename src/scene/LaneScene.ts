@@ -43,6 +43,10 @@ const CHARACTER_STAND = new THREE.Vector3(0, 0, START_Z + 0.9)
 const PRE_THROW_POS = new THREE.Vector3(0.75, 2.0, START_Z + 3.1)
 const PRE_THROW_LOOK = new THREE.Vector3(0, 0.75, PIN_STAND_Z + 1)
 const FORWARD_DIR = new THREE.Vector3(0, 0, -1)
+// Dauer der Wurf-Armbewegung in CharacterModel ('throw'-State, siehe dort) plus kleiner Puffer -
+// die Kamera bleibt mindestens so lange auf der Wurf-Einstellung stehen, bevor sie der Kugel
+// hinterherzieht (siehe tick()).
+const THROW_ANIM_DURATION_MS = 450
 
 /** Kamera-Framing für die Reaktions-Einstellung nach dem Ergebnis-Blick auf die Kegel (Teil:
  * Kamera-Zoom je nach Reaktion) - näher/enger bei Freude und Trauer für den emotionalen Moment,
@@ -506,9 +510,18 @@ export class LaneScene {
         this.settleTimerMs = 0
       }
 
-      // Kamera folgt der Kugel während des Rollens.
+      // Kamera folgt der Kugel während des Rollens - aber erst, nachdem die Wurf-Armbewegung
+      // (siehe CharacterModel 'throw', 0.4s) sichtbar durchgelaufen ist. Ohne diese Verzögerung
+      // sprang die Kamera schon im allerersten Frame nach dem Loslassen Richtung Kugel, die direkt
+      // neben dem Charakter startet - die Zielposition dafür liegt dadurch quasi im Hinterkopf des
+      // Charakters (nur ~0,7m dahinter auf Kopfhöhe), bis die Kugel genug Abstand gewonnen hat.
+      // Ergebnis: die Wurfanimation war praktisch nie zu sehen (Nutzer-Feedback: "keine
+      // Wurfanimation sichtbar"). THROW_ANIM_DURATION_MS hält die Kamera so lange auf der
+      // Wurf-Einstellung, bis die Kugel längst sichtbar abgerollt ist.
       const ballPos = this.ball.mesh.position
-      this.cameraRig.followBehind(ballPos, new THREE.Vector3(0, 0, 1), 1.6, 1.1, Math.min(rawDt * 3, 1))
+      if (this.rollingElapsedMs > THROW_ANIM_DURATION_MS) {
+        this.cameraRig.followBehind(ballPos, new THREE.Vector3(0, 0, 1), 1.6, 1.1, Math.min(rawDt * 3, 1))
+      }
 
       if (this.settleTimerMs >= SETTLE_DURATION_MS) {
         this.throwPhase = 'settled'
