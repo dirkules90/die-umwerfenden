@@ -206,7 +206,7 @@ export async function cancelDuel(duelId: string, characterId: CharacterId): Prom
   }
 }
 
-function rankParticipants(duel: DuelRow, participants: DuelParticipantRow[]): DuelParticipantRow[] {
+export function rankParticipants(duel: DuelRow, participants: DuelParticipantRow[]): DuelParticipantRow[] {
   const played = participants.filter((p) => p.response === 'accepted' && p.score !== null)
   const higherIsBetter = duel.mode === 'hausnummer_hoch'
   const better = (a: number, b: number) => (higherIsBetter ? a > b : a < b)
@@ -217,7 +217,7 @@ function rankParticipants(duel: DuelRow, participants: DuelParticipantRow[]): Du
  * Pott-Aufteilung) - bei einem Gleichstand um den letzten bezahlten Platz (z. B. zwei Leute teilen
  * sich Platz 1 bei "Gewinner bekommt alles") zählen BEIDE als Gewinner und teilen sich den Pott,
  * statt dass per Sortier-Zufall nur einer von beiden ausgezahlt wird. */
-function selectWinners(ranked: DuelParticipantRow[], placeCount: number): DuelParticipantRow[] {
+export function selectWinners(ranked: DuelParticipantRow[], placeCount: number): DuelParticipantRow[] {
   const distinctScores: number[] = []
   for (const p of ranked) {
     if (!distinctScores.includes(p.score!)) distinctScores.push(p.score!)
