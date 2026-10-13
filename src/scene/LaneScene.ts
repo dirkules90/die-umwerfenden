@@ -1,4 +1,8 @@
 import * as THREE from 'three'
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import type RAPIER from '@dimforge/rapier3d-compat'
 import { ensureRapierInitialized, createWorld, FIXED_TIMESTEP } from '../physics/world'
 import { isInGutter, isPinFallen } from '../physics/collisions'
@@ -61,6 +65,8 @@ function reactionCameraFor(mood: ThrowMood): { pos: THREE.Vector3; look: THREE.V
 
 export class LaneScene {
   private renderer: THREE.WebGLRenderer
+  private composer: EffectComposer
+  private bloomPass: UnrealBloomPass
   private scene = new THREE.Scene()
   private cameraRig: CameraRig
   private clock = new THREE.Clock()
@@ -90,6 +96,11 @@ export class LaneScene {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    // Filmischer Tonemapper statt linearem Output (Teil: optische Überarbeitung) - zieht sehr
+    // helle Flächen (Himmel, Sonnenlicht auf der Betonbahn) sanfter zusammen statt hart
+    // auszubrennen, wirkt dadurch insgesamt weicher/wärmer statt grell-digital.
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping
+    this.renderer.toneMappingExposure = 1.05
 
     this.cameraRig = new CameraRig(canvas.clientWidth / Math.max(canvas.clientHeight, 1))
 
@@ -97,6 +108,19 @@ export class LaneScene {
     const trajMat = new THREE.LineDashedMaterial({ color: 0xffffff, dashSize: 0.15, gapSize: 0.1, opacity: 0.8, transparent: true })
     this.aimTrajectory = new THREE.Line(trajGeo, trajMat)
     this.aimTrajectory.visible = false
+
+    // Dezentes Bloom (Teil: optische Überarbeitung) - nur die hellsten Stellen (Himmel, direktes
+    // Sonnenlicht-Glint auf der Kugel) bekommen einen ganz leichten Glanzsaum, bewusst niedrig
+    // dosiert (strength 0.22), damit es nicht wie ein Weichzeichner über dem ganzen Bild wirkt.
+    // RenderPass+Bloom rendern in Linear-Space; OutputPass am Ende wendet Tonemapping/Farbraum
+    // genau einmal an (ohne sie würde das Bild blass/übersättigt wirken).
+    const width = canvas.clientWidth || 1
+    const height = canvas.clientHeight || 1
+    this.composer = new EffectComposer(this.renderer)
+    this.composer.addPass(new RenderPass(this.scene, this.cameraRig.camera))
+    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(width, height), 0.22, 0.5, 0.86)
+    this.composer.addPass(this.bloomPass)
+    this.composer.addPass(new OutputPass())
   }
 
   async init() {
@@ -178,12 +202,17 @@ export class LaneScene {
   resize(width: number, height: number) {
     this.renderer.setSize(width, height, false)
     this.cameraRig.setAspect(width / Math.max(height, 1))
+    this.composer.setSize(width, height)
+    this.bloomPass.resolution.set(width, height)
   }
 
   private setupLights() {
-    const hemi = new THREE.HemisphereLight(0xbfe3ff, 0x4c9a3a, 0.65)
+    // Wärmeres, weicheres Licht statt des vorherigen eher kühl-neutralen Setups (Teil: optische
+    // Überarbeitung) - Hemisphäre und Sonnenfarbe leicht Richtung goldene Stunde verschoben, dazu
+    // ein größerer Schattenradius für weichere statt harte Schattenkanten.
+    const hemi = new THREE.HemisphereLight(0xcfe8ff, 0x5a9a3f, 0.7)
     this.scene.add(hemi)
-    const sun = new THREE.DirectionalLight(0xfff4d6, 1.4)
+    const sun = new THREE.DirectionalLight(0xffdfae, 1.3)
     sun.position.set(-8, 14, 8)
     sun.castShadow = true
     sun.shadow.mapSize.set(1024, 1024)
@@ -192,8 +221,9 @@ export class LaneScene {
     sun.shadow.camera.top = 12
     sun.shadow.camera.bottom = -12
     sun.shadow.camera.far = 40
+    sun.shadow.radius = 3.5
     this.scene.add(sun)
-    const fill = new THREE.AmbientLight(0xffffff, 0.25)
+    const fill = new THREE.AmbientLight(0xfff2e0, 0.28)
     this.scene.add(fill)
   }
 
@@ -549,13 +579,14 @@ export class LaneScene {
       }
     }
 
-    this.renderer.render(this.scene, this.cameraRig.camera)
+    this.composer.render()
   }
 
   dispose() {
     this.disposed = true
     this.renderer.setAnimationLoop(null)
     this.particles?.dispose()
+    this.composer.dispose()
     this.renderer.dispose()
   }
 }

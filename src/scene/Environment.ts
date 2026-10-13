@@ -8,6 +8,7 @@ import {
   RUNUP_LENGTH,
   START_Z,
 } from '../physics/laneConstants'
+import { toonMaterial } from './toonMaterial'
 
 // Farbpalette gemäß Teil 5.2 / 22.3.
 const COLORS = {
@@ -24,8 +25,11 @@ const COLORS = {
   roof: 0x4a3528,
 }
 
-function toonMat(color: number, roughness = 0.9): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.05, flatShading: false })
+// Lokaler Alias (Teil: optische Überarbeitung) - der zweite Parameter (bisher "roughness") wird
+// von echtem Cel-Shading (MeshToonMaterial) nicht mehr ausgewertet, bleibt aber als No-Op-Parameter
+// stehen, damit alle bestehenden Aufrufstellen unten unverändert bleiben können.
+function toonMat(color: number, _roughness = 0.9): THREE.MeshToonMaterial {
+  return toonMaterial(color)
 }
 
 // Mittelpunkt der Betonbahn (ohne Anlaufbereich) entlang der Z-Achse: Die Bahn reicht vom
@@ -37,6 +41,7 @@ export class Environment {
 
   constructor() {
     this.buildSky()
+    this.buildClouds()
     this.buildGround()
     this.buildLane()
     this.buildGutters()
@@ -51,10 +56,13 @@ export class Environment {
 
   private buildSky() {
     const skyGeo = new THREE.SphereGeometry(120, 24, 16)
+    // Kräftigeres, satteres Blau oben + wärmerer Horizont (Teil: optische Überarbeitung) - der
+    // vorherige Verlauf (0x7ec8e3 -> 0xf5f9e8) war bei der meist fast horizontalen Kameraneigung
+    // kaum wahrnehmbar, weil beide Töne sich in Helligkeit/Sättigung zu ähnlich waren.
     const skyMat = new THREE.ShaderMaterial({
       uniforms: {
-        topColor: { value: new THREE.Color(0x7ec8e3) },
-        bottomColor: { value: new THREE.Color(0xf5f9e8) },
+        topColor: { value: new THREE.Color(0x4fa8e0) },
+        bottomColor: { value: new THREE.Color(0xfdf0d5) },
       },
       vertexShader: `varying vec3 vWorldPosition; void main() {
         vec4 worldPosition = modelMatrix * vec4(position, 1.0);
@@ -64,11 +72,39 @@ export class Environment {
       fragmentShader: `varying vec3 vWorldPosition; uniform vec3 topColor; uniform vec3 bottomColor;
       void main() {
         float h = normalize(vWorldPosition).y * 0.5 + 0.5;
-        gl_FragColor = vec4(mix(bottomColor, topColor, clamp(h, 0.0, 1.0)), 1.0);
+        gl_FragColor = vec4(mix(bottomColor, topColor, pow(clamp(h, 0.0, 1.0), 0.55)), 1.0);
       }`,
       side: THREE.BackSide,
     })
     this.group.add(new THREE.Mesh(skyGeo, skyMat))
+  }
+
+  /** Flache, tief liegende Low-Poly-Wolken (Teil: optische Überarbeitung) - mehrere überlappende,
+   * y-gestauchte Icosaeder statt einer Textur, damit sie zum restigen Low-Poly-/Cel-Shading-Stil
+   * der Szene passen. Material bewusst MeshBasicMaterial statt Toon: Wolken sollen gleichmäßig
+   * hell wirken, nicht von der Sonnenrichtung abhängig beschattet werden. */
+  private buildClouds() {
+    const cloudMat = new THREE.MeshBasicMaterial({ color: 0xfffdf6, transparent: true, opacity: 0.92 })
+    const cloudSpots: [number, number, number, number][] = [
+      [-18, 16, -30, 1.3],
+      [10, 18, -36, 1.6],
+      [-6, 20, -46, 1.1],
+      [22, 15, -20, 1.0],
+      [-28, 13, -10, 0.95],
+      [30, 17, -42, 1.35],
+    ]
+    for (const [x, y, z, scale] of cloudSpots) {
+      const cloud = new THREE.Group()
+      const puffCount = 4 + Math.floor(scale * 2)
+      for (let i = 0; i < puffCount; i++) {
+        const puff = new THREE.Mesh(new THREE.IcosahedronGeometry(0.55 + Math.random() * 0.35, 0), cloudMat)
+        puff.position.set((Math.random() - 0.5) * 2.2 * scale, (Math.random() - 0.5) * 0.4 * scale, (Math.random() - 0.5) * 1.1 * scale)
+        cloud.add(puff)
+      }
+      cloud.scale.set(scale, scale * 0.55, scale)
+      cloud.position.set(x, y, z)
+      this.group.add(cloud)
+    }
   }
 
   private buildGround() {

@@ -13,6 +13,7 @@ import type {
   WristbandId,
 } from '../game/types'
 import { drawFace, type Mood } from './faceArt'
+import { toonMaterial } from '../scene/toonMaterial'
 
 const PANTS_COLORS: Record<PantsColorId, number> = {
   standard: 0x3a4a5c,
@@ -113,7 +114,12 @@ const BUILD_SCALE: Record<AvatarConfig['build'], number> = {
 
 const ARM_LENGTH = 0.34
 const SHOULDER_Y = 0.97
-const SHOULDER_X = 0.205
+// Breitere Schultern + kleinerer Kopf (siehe headRadius unten) statt des bisherigen, stark
+// kindlich-rundlichen Mii-Verhältnisses (Teil: Charakter "menschlicher" wie auf dem Flyer) - ein
+// etwas athletischerer Oberkörper trägt den großen, bemalten Kopf besser, ohne den
+// Low-Poly-/Cartoon-Stil selbst aufzugeben.
+const SHOULDER_X = 0.225
+const TORSO_RADIUS = 0.205
 const ARM_REST_LEAN = 0.16
 
 // Gecachte Textur für das "Die Umwerfenden"-Shirt-Badge (Teil: Kosmetik-Shop) - dieselbe Textur
@@ -187,18 +193,23 @@ export class CharacterModel {
     const scale = BUILD_SCALE[config.build]
     this.group.scale.setScalar(scale)
 
-    const skinMat = new THREE.MeshStandardMaterial({ color: config.skinColor, roughness: 0.7 })
-    const shirtMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 })
-    const accentMat = new THREE.MeshStandardMaterial({ color: config.shirtAccent, roughness: 0.8 })
-    const hairMat = new THREE.MeshStandardMaterial({ color: cosmetics.hairColor, roughness: 0.6 })
+    // Echtes Cel-Shading (Teil: optische Überarbeitung) über den gemeinsamen toonMaterial()-Helfer
+    // statt flacher MeshStandardMaterial-Flächen - sorgt für die harten Hell/Dunkel-Bänder, die
+    // zum übrigen Comic-Look der Szene (Environment.ts, Pin.ts) passen. Gesicht bleibt bewusst
+    // MeshStandardMaterial (siehe faceMat unten), damit die bemalte Mimik nicht durch Cel-Banding
+    // verzerrt wird.
+    const skinMat = toonMaterial(config.skinColor)
+    const shirtMat = toonMaterial(0xffffff)
+    const accentMat = toonMaterial(config.shirtAccent)
+    const hairMat = toonMaterial(cosmetics.hairColor)
     // Hosenfarbe/Schuhfarbe (Teil: Shop-Erweiterung) statt fester Farben - Tarnmuster bekommt
     // zusätzlich eine gekachelte Canvas-Textur statt nur einer flachen Farbe.
-    const pantsMat = new THREE.MeshStandardMaterial({ color: PANTS_COLORS[cosmetics.pantsColor], roughness: 0.9 })
+    const pantsMat = toonMaterial(PANTS_COLORS[cosmetics.pantsColor])
     if (cosmetics.pantsColor === 'camo') {
       pantsMat.map = buildCamoTexture()
     }
-    const shoeMat = new THREE.MeshStandardMaterial({ color: SHOE_COLORS[cosmetics.shoeColor], roughness: 0.6 })
-    const gloveMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.5 })
+    const shoeMat = toonMaterial(SHOE_COLORS[cosmetics.shoeColor])
+    const gloveMat = toonMaterial(0x1a1a1a)
 
     // Beine + Schuhe (Boden bis Hüfte y=0.58)
     for (const side of [-1, 1]) {
@@ -223,12 +234,12 @@ export class CharacterModel {
     this.group.add(hip)
 
     // Torso (Hüfte 0.58 bis Schulterbereich ~1.02)
-    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.19, 0.08, 4, 10), shirtMat)
+    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(TORSO_RADIUS, 0.08, 4, 10), shirtMat)
     torso.position.y = 0.8
     torso.castShadow = true
     this.torsoGroup.add(torso)
 
-    const accentStripe = new THREE.Mesh(new THREE.CylinderGeometry(0.195, 0.195, 0.07, 10), accentMat)
+    const accentStripe = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_RADIUS + 0.005, TORSO_RADIUS + 0.005, 0.07, 10), accentMat)
     accentStripe.position.y = 0.63
     this.torsoGroup.add(accentStripe)
 
@@ -322,7 +333,10 @@ export class CharacterModel {
     // an EINER gemeinsam eiförmig skalierten Gruppe statt einzeln zu skalieren - sonst passen
     // Frisur/Brille/Stirnband nicht mehr zur gestreckten Kopfform (Bug: Kurzhaarschnitt schwebte
     // über dem Kopf, weil nur die Kopf-Kugel selbst gestreckt wurde, die Frisur aber nicht mit).
-    const headRadius = 0.2
+    // Vorher 0.2 - im Verhältnis zum Körper der dominante "Mii-Kleinkind"-Look, den der Flyer so
+    // nicht zeigt. Etwas kleinerer Kopf + die breiteren Schultern (siehe SHOULDER_X/TORSO_RADIUS
+    // oben) zusammen ergeben ein spürbar erwachseneres, aber weiterhin stilisiertes Low-Poly-Build.
+    const headRadius = 0.182
     const skullGroup = new THREE.Group()
     skullGroup.scale.set(1, 1.08, 0.94)
     this.headGroup.add(skullGroup)
@@ -571,7 +585,7 @@ export class CharacterModel {
     const texture = style === 'umwerfenden' ? getUmwerfendenBadgeTexture() : buildBlitzBadgeTexture()
     const badgeMat = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.8, transparent: true })
     const badge = new THREE.Mesh(new THREE.CircleGeometry(0.115, 20), badgeMat)
-    badge.position.set(0, 0.86, 0.185)
+    badge.position.set(0, 0.86, TORSO_RADIUS + 0.01)
     this.torsoGroup.add(badge)
   }
 

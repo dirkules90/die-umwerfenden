@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import type RAPIER from '@dimforge/rapier3d-compat'
 import { PIN_HEIGHT, PIN_RADIUS } from '../physics/laneConstants'
+import { toonMaterial } from './toonMaterial'
 
 const RING_COLORS = [0xc0392b, 0x2e7d32]
 
@@ -43,14 +44,14 @@ export class Pin {
 
     const group = new THREE.Group()
     const bodyGeo = new THREE.LatheGeometry(buildPinProfile(), 16)
-    const bodyMat = new THREE.MeshStandardMaterial({ color: 0xe8d4a8, roughness: 0.6 })
+    const bodyMat = toonMaterial(0xe8d4a8)
     const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat)
     bodyMesh.castShadow = true
 
     const ringColor = index === 8 ? 0xf1c40f : RING_COLORS[index % 2]
     const ring = new THREE.Mesh(
       new THREE.CylinderGeometry(PIN_RADIUS * 0.62, PIN_RADIUS * 0.62, PIN_HEIGHT * 0.1, 12),
-      new THREE.MeshStandardMaterial({ color: ringColor, roughness: 0.5 }),
+      toonMaterial(ringColor),
     )
     ring.position.y = -PIN_HEIGHT / 2 + 0.66 * PIN_HEIGHT
     group.add(bodyMesh, ring)

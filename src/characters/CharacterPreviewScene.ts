@@ -42,17 +42,21 @@ export class CharacterPreviewScene {
     this.canvas = canvas
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    // Gleicher Tonemapper wie LaneScene (Teil: optische Überarbeitung) - sonst wirkt der
+    // Charakter in der Shop-Vorschau sichtbar anders (kälter/flacher) als im Spiel selbst.
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping
+    this.renderer.toneMappingExposure = 1.05
 
     this.camera = new THREE.PerspectiveCamera(36, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 10)
     this.camera.position.set(0, 0.98, 3.1)
     this.camera.lookAt(0, 0.82, 0)
 
-    const hemi = new THREE.HemisphereLight(0xffffff, 0x445533, 0.9)
+    const hemi = new THREE.HemisphereLight(0xfff0d8, 0x445533, 0.9)
     this.scene.add(hemi)
-    const sun = new THREE.DirectionalLight(0xfff4d6, 1.1)
+    const sun = new THREE.DirectionalLight(0xffdfae, 1.1)
     sun.position.set(-2, 3, 2)
     this.scene.add(sun)
-    const fill = new THREE.AmbientLight(0xffffff, 0.35)
+    const fill = new THREE.AmbientLight(0xfff2e0, 0.35)
     this.scene.add(fill)
 
     canvas.style.touchAction = 'none'
