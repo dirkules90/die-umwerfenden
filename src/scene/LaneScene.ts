@@ -27,6 +27,7 @@ import { Lever } from './Lever'
 import { CameraRig } from './CameraRig'
 import { Animator } from './Animator'
 import { ParticleSystem } from './ParticleFX'
+import { ScorePopup } from './ScorePopup'
 import { CharacterModel } from '../characters/CharacterModel'
 import type { AvatarConfig, CosmeticLoadout } from '../game/types'
 import type { ThrowMood } from '../game/moodRules'
@@ -90,6 +91,7 @@ export class LaneScene {
   private rollingElapsedMs = 0
   private aimTrajectory: THREE.Line
   private particles!: ParticleSystem
+  private scorePopup!: ScorePopup
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false })
@@ -132,6 +134,7 @@ export class LaneScene {
     this.scene.add(env.group)
     this.scene.add(this.aimTrajectory)
     this.particles = new ParticleSystem(this.scene)
+    this.scorePopup = new ScorePopup(this.scene)
 
     // Statische Kollisionsfläche der Bahn - bewusst exakt auf Bahnbreite begrenzt (nicht mehr
     // bis weit in die Wiese hinein), damit die Rinne echt tiefer liegen kann (siehe unten) statt
@@ -499,6 +502,7 @@ export class LaneScene {
     this.animator.update(rawDt)
     this.cameraRig.update(rawDt)
     this.particles.update(rawDt)
+    this.scorePopup.update(rawDt)
     if (this.throwPhase === 'rolling') {
       const trailPos = this.ball.mesh.position.clone()
       trailPos.y = 0.02
@@ -565,6 +569,13 @@ export class LaneScene {
         const resultPos = new THREE.Vector3(0.8, 1.3, PIN_STAND_Z + 2.2)
         this.cameraRig.tweenTo(resultPos, resultLook, 0.5)
 
+        // Punkte-Popup direkt über dem Kegelstand (Teil: Grafik-Feedback, Nutzer-Wunsch "auch
+        // Punkte in Grafik geben") - zusätzlich zur Zahl in der Seitenleiste, direkt am Ort des
+        // Einschlags sichtbar.
+        const popupText = wasAllNine ? 'ALLE NEUNE!' : isGutter ? 'Rinne' : `+${pinsDown}`
+        const popupColor = wasAllNine ? '#ffd447' : isGutter ? '#ff8a70' : '#ffffff'
+        this.scorePopup.show(new THREE.Vector3(0, 1.7, PIN_STAND_Z - 0.4), popupText, popupColor)
+
         // Alle-Neune sticht als Stimmung immer heraus (seltener Achievement-Moment), sonst
         // entscheidet der Aufrufer modusabhängig (siehe releaseThrow evaluateMood) - ohne
         // Evaluator eine einfache, modusunabhängige Einschätzung als Rückfalloption.
@@ -586,6 +597,7 @@ export class LaneScene {
     this.disposed = true
     this.renderer.setAnimationLoop(null)
     this.particles?.dispose()
+    this.scorePopup?.dispose()
     this.composer.dispose()
     this.renderer.dispose()
   }

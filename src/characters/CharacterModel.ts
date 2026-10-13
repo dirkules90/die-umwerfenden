@@ -188,6 +188,13 @@ export class CharacterModel {
   private blinkTimer = 2 + Math.random() * 4
   private isBlinking = false
   private blinkElapsed = 0
+  // Idle-Fidgets (Nutzer-Wunsch: "zufällige Szenen... lacht, Arm nach oben zum Jubeln, zwinkert...
+  // vielleicht vor dem Spiel") - läuft automatisch immer dann, wenn der Charakter länger im
+  // 'idle'-Zustand steht (also auch schon VOR dem ersten Wurf, da der Konstruktor-Default-Zustand
+  // bereits 'idle' ist), ohne eine eigene Vor-Spiel-Szene zu brauchen.
+  private fidgetTimer = 5 + Math.random() * 8
+  private fidgetKind: 'none' | 'wink' | 'fistpump' | 'laugh' = 'none'
+  private fidgetElapsed = 0
 
   constructor(config: AvatarConfig, cosmetics: CosmeticLoadout) {
     const scale = BUILD_SCALE[config.build]
@@ -355,6 +362,7 @@ export class CharacterModel {
       meh: buildFaceTexture('meh', config.skinColor),
       sad: buildFaceTexture('sad', config.skinColor),
       blink: buildFaceTexture('blink', config.skinColor),
+      wink: buildFaceTexture('wink', config.skinColor),
     }
     const faceMat = new THREE.MeshStandardMaterial({ map: this.faceTextures.neutral, roughness: 0.75 })
     const facePhiWidth = 1.25
@@ -691,8 +699,28 @@ export class CharacterModel {
         const wobble = Math.sin(this.time * 2) * 0.02
         this.torsoGroup.rotation.z = wobble
         this.headGroup.rotation.z = wobble * 0.5
-        this.rightArmPivot.rotation.x = 0
-        this.leftArmPivot.rotation.x = Math.sin(this.time * 2) * 0.05
+
+        if (this.fidgetKind === 'none') {
+          this.rightArmPivot.rotation.x = 0
+          this.leftArmPivot.rotation.x = Math.sin(this.time * 2) * 0.05
+          this.fidgetTimer -= dt
+          if (this.fidgetTimer <= 0) {
+            const kinds = ['wink', 'fistpump', 'laugh'] as const
+            this.fidgetKind = kinds[Math.floor(Math.random() * kinds.length)]
+            this.fidgetElapsed = 0
+          }
+        } else {
+          this.fidgetElapsed += dt
+          const done = this.updateFidget(this.fidgetKind, this.fidgetElapsed)
+          if (done) {
+            this.fidgetKind = 'none'
+            this.fidgetTimer = 6 + Math.random() * 9
+            this.applyMood('neutral')
+            this.rightArmPivot.rotation.x = 0
+            this.leftArmPivot.rotation.x = 0
+            this.group.position.y = 0
+          }
+        }
         break
       }
       case 'backswing': {
@@ -755,10 +783,10 @@ export class CharacterModel {
       }
     }
 
-    // Idle-Blinzeln (Teil: UI-Politur) - nur in echter Ruhehaltung, damit ein Blinzeln nicht
-    // mitten in eine Wurf-/Reaktionsanimation hineinplatzt und die dortige Stimmungstextur
-    // überschreibt.
-    if (this.state === 'idle') {
+    // Idle-Blinzeln (Teil: UI-Politur) - nur in echter Ruhehaltung UND außerhalb eines Fidgets
+    // (siehe oben), sonst würde ein Blinzeln mitten in ein 'wink' hineinplatzen und dessen
+    // Gesichtstextur gleich wieder überschreiben.
+    if (this.state === 'idle' && this.fidgetKind === 'none') {
       if (this.isBlinking) {
         this.blinkElapsed += dt
         if (this.blinkElapsed > 0.12) {
@@ -777,12 +805,46 @@ export class CharacterModel {
     }
   }
 
+  /** Einzelne zufällige Idle-Szene (Nutzer-Wunsch: "mal lacht, Arm nach oben zum Jubeln [...],
+   * zwinkert") - läuft nur während echter Ruhehaltung (siehe 'idle'-Fall oben), spielt sich also
+   * z.B. auch schon vor dem ersten Wurf ab, während der Charakter auf den Spielstart wartet.
+   * Gibt true zurück, sobald die jeweilige Geste durchgelaufen ist. */
+  private updateFidget(kind: 'wink' | 'fistpump' | 'laugh', t: number): boolean {
+    switch (kind) {
+      case 'wink': {
+        const duration = 0.55
+        this.applyMood('wink')
+        this.headGroup.rotation.z = Math.sin(Math.min(t / duration, 1) * Math.PI) * 0.08
+        return t >= duration
+      }
+      case 'fistpump': {
+        // Kein Daumen-hoch möglich (der Charakter hat keine beweglichen Finger) - stattdessen ein
+        // kurzer Faustpump: Arm schnellt hoch, hält kurz, kommt zurück.
+        const duration = 1.0
+        const raise = Math.sin(Math.min(t / duration, 1) * Math.PI)
+        this.rightArmPivot.rotation.x = -raise * 2.3
+        this.applyMood(t < duration * 0.85 ? 'happy' : 'neutral')
+        return t >= duration
+      }
+      case 'laugh': {
+        const duration = 0.9
+        const settle = Math.max(0, 1 - t / duration)
+        this.group.position.y = Math.abs(Math.sin(t * 10)) * 0.08 * settle
+        this.torsoGroup.rotation.z = Math.sin(t * 10) * 0.05 * settle
+        this.applyMood(t < duration * 0.85 ? 'happy' : 'neutral')
+        return t >= duration
+      }
+    }
+  }
+
   resetPose() {
     this.group.position.y = 0
     this.headGroup.rotation.set(0, 0, 0)
     this.torsoGroup.rotation.set(0, 0, 0)
     this.leftArmPivot.rotation.set(0, 0, -ARM_REST_LEAN)
     this.rightArmPivot.rotation.set(0, 0, ARM_REST_LEAN)
+    this.fidgetKind = 'none'
+    this.fidgetElapsed = 0
     this.setAnimState('idle')
   }
 }

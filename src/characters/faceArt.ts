@@ -1,6 +1,7 @@
-/** 'blink' ist keine echte Stimmung, sondern ein kurzer Augenschluss-Frame für die Idle-Animation
- * (Teil: UI-Politur, siehe CharacterModel.update) - macht die Figur in Ruhehaltung lebendiger. */
-export type Mood = 'neutral' | 'happy' | 'meh' | 'sad' | 'blink'
+/** 'blink' und 'wink' sind keine echten Stimmungen, sondern kurze Idle-Animation-Frames (Teil:
+ * UI-Politur / Idle-Fidgets, siehe CharacterModel.update) - machen die Figur in Ruhehaltung bzw.
+ * vor dem Spiel lebendiger. */
+export type Mood = 'neutral' | 'happy' | 'meh' | 'sad' | 'blink' | 'wink'
 
 /**
  * Bemaltes Mii-artiges Gesicht (Teil: Charaktermodell-Überarbeitung, Vorbild Wii-Bowling-Mii) - wird
@@ -56,6 +57,32 @@ export function drawFace(ctx: CanvasRenderingContext2D, mood: Mood, skinColor: s
       ctx.lineTo(x + 20 * s, eyeY)
       ctx.stroke()
     }
+  } else if (mood === 'wink') {
+    // Ein Auge geschlossen (derselbe Strich wie 'blink', aber nur auf einer Seite), das andere
+    // offen - für den gelegentlichen Idle-Fidget (Nutzer-Wunsch: "zwinkert").
+    ctx.strokeStyle = ink
+    ctx.lineWidth = 6 * s
+    ctx.lineCap = 'round'
+    ctx.beginPath()
+    ctx.moveTo(rightX - 20 * s, eyeY)
+    ctx.lineTo(rightX + 20 * s, eyeY)
+    ctx.stroke()
+
+    ctx.fillStyle = '#ffffff'
+    ctx.strokeStyle = ink
+    ctx.lineWidth = 4 * s
+    ctx.beginPath()
+    ctx.ellipse(leftX, eyeY, 25 * s, 28 * s, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.stroke()
+    ctx.fillStyle = ink
+    ctx.beginPath()
+    ctx.arc(leftX, eyeY + 3 * s, 11 * s, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.fillStyle = '#ffffff'
+    ctx.beginPath()
+    ctx.arc(leftX - 4 * s, eyeY - 3 * s, 4 * s, 0, Math.PI * 2)
+    ctx.fill()
   } else {
     for (const x of [leftX, rightX]) {
       const squint = mood === 'sad' ? 0.8 : 1
