@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useGameStore } from '../../state/gameStore'
 import { AVATAR_CONFIGS, CHARACTER_ORDER } from '../../characters/avatarConfigs'
 import { formatPoints } from '../formatPoints'
@@ -7,7 +8,14 @@ import { AmbientBackground } from '../components/AmbientBackground'
 export function AllTimeScreen() {
   const allTimeBoard = useGameStore((s) => s.allTimeBoard)
   const allTimeWeeklyWins = useGameStore((s) => s.allTimeWeeklyWins)
+  const syncAllTimeBoard = useGameStore((s) => s.syncAllTimeBoard)
   const goTo = useGameStore((s) => s.goTo)
+
+  // Geräteübergreifenden Stand nachziehen (Teil: Statistik-Cloud-Sync) - analog zu
+  // WeeklyScreen/syncWeeklyDuelBonus, damit Fortschritt von anderen Geräten hier sichtbar wird.
+  useEffect(() => {
+    void syncAllTimeBoard()
+  }, [syncAllTimeBoard])
 
   const sortedRows = CHARACTER_ORDER.map((id) => ({
     id,

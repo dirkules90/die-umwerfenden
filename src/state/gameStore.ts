@@ -131,6 +131,7 @@ import {
   type CreateDuelInput,
   type Duel,
 } from '../backend/duels'
+import { addAllTimeProgress, fetchAllTimeBoard, syncPlayerStatistics } from '../backend/playerStats'
 
 export type Screen =
   | 'start'
@@ -300,10 +301,31 @@ interface GameStore {
   loadCoinHistory: (id: CharacterId) => Promise<void>
   loadWalletBalances: () => Promise<void>
   syncWeeklyDuelBonus: () => Promise<void>
+  syncAllTimeBoard: () => Promise<void>
 }
 
 function statsFor(store: Record<CharacterId, PlayerStatistics>, id: CharacterId): PlayerStatistics {
   return store[id] ?? emptyStatistics()
+}
+
+/** Best-effort Cloud-Sync der Statistik EINES Charakters (Teil: Statistik-Cloud-Sync) - mergt mit
+ * dem zuletzt in der Cloud gespeicherten Stand (siehe backend/playerStats.ts
+ * mergePlayerStatistics) und übernimmt das Ergebnis lokal, falls es vom gerade gespeicherten Stand
+ * abweicht (z.B. weil ein anderes Gerät zwischenzeitlich einen Achievement-Eintrag beigetragen
+ * hat). Läuft im Hintergrund, blockiert also nie das eigentliche Spielgeschehen - bei Offline
+ * bleibt einfach der lokale Stand bestehen, bis die nächste Synchronisierung wieder gleichzieht. */
+function syncStatsBestEffort(
+  id: CharacterId,
+  localStats: PlayerStatistics,
+  set: (partial: Partial<GameStore>) => void,
+  get: () => GameStore,
+) {
+  void syncPlayerStatistics(id, localStats).then((merged) => {
+    if (JSON.stringify(merged) === JSON.stringify(localStats)) return
+    const updated = { ...get().statistics, [id]: merged }
+    saveAllStatistics(updated)
+    set({ statistics: updated })
+  })
 }
 
 /** Fehlende Unterfelder (z.B. glassesStyle/watch/headband bei vor dieser Erweiterung gespeicherten
@@ -431,9 +453,21 @@ function processDailyAndWeeklyRollover(): {
   }
 
   if (weekKey !== currentWeekKey()) {
+    // Geräteübergreifender Beitrag zur Allzeit-Bestenliste (Teil: Statistik-Cloud-Sync) - additiv
+    // statt Snapshot (siehe add_alltime_progress), pro Charakter nur der tatsächliche Zuwachs
+    // dieser Woche, damit zwei Geräte sich nie gegenseitig überschreiben können.
+    const allTimeDeltas: Partial<Record<CharacterId, { points: number; weeklyWins: number }>> = {}
+    function addAllTimeDelta(id: CharacterId, points: number, weeklyWins: number) {
+      const cur = allTimeDeltas[id] ?? { points: 0, weeklyWins: 0 }
+      allTimeDeltas[id] = { points: cur.points + points, weeklyWins: cur.weeklyWins + weeklyWins }
+    }
+
     const updatedBoard = { ...allTimeBoard }
     for (const [id, points] of Object.entries(weeklyPoints) as [CharacterId, number][]) {
-      if (points > 0) updatedBoard[id] = (updatedBoard[id] ?? 0) + points
+      if (points > 0) {
+        updatedBoard[id] = (updatedBoard[id] ?? 0) + points
+        addAllTimeDelta(id, points, 0)
+      }
     }
     allTimeBoard = updatedBoard
     saveAllTimeBoard(allTimeBoard)
@@ -442,7 +476,10 @@ function processDailyAndWeeklyRollover(): {
     if (weekWinners.length > 0) {
       const share = 1 / weekWinners.length
       const updatedWins = { ...allTimeWeeklyWins }
-      for (const id of weekWinners) updatedWins[id] = (updatedWins[id] ?? 0) + share
+      for (const id of weekWinners) {
+        updatedWins[id] = (updatedWins[id] ?? 0) + share
+        addAllTimeDelta(id, 0, share)
+      }
       allTimeWeeklyWins = updatedWins
       saveAllTimeWeeklyWins(allTimeWeeklyWins)
 
@@ -454,6 +491,10 @@ function processDailyAndWeeklyRollover(): {
         updatedCosmetics = grantCrown(updatedCosmetics, id)
       }
       saveAllCosmetics(updatedCosmetics)
+    }
+
+    for (const [id, delta] of Object.entries(allTimeDeltas) as [CharacterId, { points: number; weeklyWins: number }][]) {
+      void addAllTimeProgress(id, delta.points, delta.weeklyWins)
     }
     weekKey = currentWeekKey()
     weeklyPoints = {}
@@ -550,6 +591,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
   completeLogin: (id) => {
     set({ currentPlayer: id, selectedPlayer: id, shopPlayer: id, duelsPlayer: id })
     get().goTo(get().pendingAfterLogin)
+    // Direkt beim Login die Cloud-Statistik abholen und mit dem lokalen Stand mergen (Teil:
+    // Statistik-Cloud-Sync) - holt Fortschritt nach, den ein anderes Gerät seit dem letzten
+    // lokalen Sync beigetragen hat, ohne den Login/die Navigation selbst zu blockieren.
+    syncStatsBestEffort(id, statsFor(get().statistics, id), set, get)
   },
 
   logout: () => {
@@ -611,6 +656,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     saveWeeklyLoginDays(weeklyLoginDays)
 
     set({ cosmetics, loginBonusDates, statistics, weeklyLoginDays, achievementBanner: banner })
+    syncStatsBestEffort(id, ps, set, get)
     return true
   },
 
@@ -985,6 +1031,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       pendingAllNine,
       achievementBanner: banner ?? get().achievementBanner,
     })
+    if (updatedStats[player] !== statistics[player]) syncStatsBestEffort(player, updatedStats[player], set, get)
   },
 
   chooseDigit: (slot) => {
@@ -1105,6 +1152,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
               console.error('submitDuelScore failed', err),
             )
           }
+          syncStatsBestEffort(player, ps, set, get)
         }
         saveAllStatistics(updatedStats)
         if (updatedCosmetics !== cosmetics) saveAllCosmetics(updatedCosmetics)
@@ -1192,6 +1240,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const updatedStats = { ...statistics, [player]: ps }
       saveAllStatistics(updatedStats)
       if (updatedCosmetics !== cosmetics) saveAllCosmetics(updatedCosmetics)
+      syncStatsBestEffort(player, ps, set, get)
 
       const activeDuelId = get().activeDuelId
       if (activeDuelId) {
@@ -1419,6 +1468,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
       saveWeeklyDuelBonusSynced(nextSynced)
       set({ weeklyPoints: nextPoints, weeklyDuelBonusSynced: nextSynced })
     }
+  },
+
+  /** Holt den geräteübergreifenden Allzeit-Stand aus der Cloud (Teil: Statistik-Cloud-Sync) - läuft
+   * beim Öffnen der Allzeit-Bestenliste, analog zu syncWeeklyDuelBonus. Additiv gepflegt (siehe
+   * add_alltime_progress), die Cloud ist hier also immer mindestens so aktuell wie der lokale
+   * Stand; bei Offline/Netzwerkfehler bleibt einfach der lokale (zuletzt bekannte) Stand bestehen. */
+  syncAllTimeBoard: async () => {
+    const { board, weeklyWins } = await fetchAllTimeBoard()
+    if (Object.keys(board).length === 0 && Object.keys(weeklyWins).length === 0) return
+    saveAllTimeBoard(board)
+    saveAllTimeWeeklyWins(weeklyWins)
+    set({ allTimeBoard: board, allTimeWeeklyWins: weeklyWins })
   },
 }))
 

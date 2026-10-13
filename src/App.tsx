@@ -64,17 +64,20 @@ function ScreenRouter() {
 
 export default function App() {
   const syncWeeklyDuelBonus = useGameStore((s) => s.syncWeeklyDuelBonus)
+  const syncAllTimeBoard = useGameStore((s) => s.syncAllTimeBoard)
   const loadWalletBalances = useGameStore((s) => s.loadWalletBalances)
   const loadDuels = useGameStore((s) => s.loadDuels)
   const currentPlayer = useGameStore((s) => s.currentPlayer)
   const isOnline = useOnlineStatus()
 
-  // Duell-Wochenbonus bei jedem App-Start nachziehen (Teil: Wochenbewertung) - deckt "man kommt
-  // später wieder rein" ab, ohne dass man extra die Wochen-Bestenliste öffnen müsste (die tut es
-  // beim eigenen Mount ohnehin nochmal, siehe ui/screens/WeeklyScreen.tsx).
+  // Duell-Wochenbonus + Allzeit-Stand bei jedem App-Start nachziehen (Teil: Wochenbewertung /
+  // Statistik-Cloud-Sync) - deckt "man kommt später wieder rein" ab, ohne dass man extra die
+  // Wochen-/Allzeit-Bestenliste öffnen müsste (die tun das beim eigenen Mount ohnehin nochmal,
+  // siehe ui/screens/WeeklyScreen.tsx / AllTimeScreen.tsx).
   useEffect(() => {
     void syncWeeklyDuelBonus()
-  }, [syncWeeklyDuelBonus])
+    void syncAllTimeBoard()
+  }, [syncWeeklyDuelBonus, syncAllTimeBoard])
 
   // Offline-Robustheit: sobald die Verbindung zurückkommt (z. B. nach Funkloch beim Spielen auf
   // dem Vereinsgelände), die backend-abhängigen Daten automatisch nachziehen, statt dass man erst
@@ -84,6 +87,7 @@ export default function App() {
     void loadWalletBalances()
     void loadDuels()
     void syncWeeklyDuelBonus()
+    void syncAllTimeBoard()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnline])
 
